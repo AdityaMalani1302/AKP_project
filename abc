@@ -1,0 +1,106 @@
+OLD
+
+PatternId	numeric(18, 0)	Unchecked
+PatternNo	varchar(255)	Checked
+Customer	numeric(18, 0)	Unchecked
+Part_No	numeric(18, 0)	Unchecked
+Product_Name	numeric(18, 0)	Unchecked
+No_Of_Cavities	varchar(255)	Checked
+Actual_Casting_Weight	varchar(255)	Checked
+Asset_No	varchar(255)	Checked
+Customer_Po_No	varchar(255)	Checked
+Tooling_PO_Date	date	Checked
+Purchase_No	varchar(255)	Checked
+Purchase_Date	date	Checked
+Quoted_Estimated_Weight	varchar(255)	Checked
+Pattern_Maker	numeric(18, 0)	Unchecked
+Pattern_Material_Details	varchar(255)	Checked
+No_Of_Patterns_Set	varchar(255)	Checked
+Pattern_Pieces	varchar(255)	Checked
+Rack_Location	varchar(255)	Checked
+Core_Box_Material_Details	varchar(255)	Checked
+Core_Box_Location	varchar(255)	Checked
+Core_Box_S7_F4_No_Date	varchar(255)	Checked
+No_Of_Core_Box_Set	varchar(255)	Checked
+Core_Box_Pieces	varchar(255)	Checked
+Casting_Material_Grade	varchar(255)	Checked
+Moulding_Box_Size	varchar(255)	Checked
+Bunch_Wt	varchar(255)	Checked
+YieldPercent	varchar(255)	Checked
+Core_Wt	varchar(255)	Checked
+Core_Type	varchar(255)	Checked
+shell_qty	int	Checked
+coldBox_qty	int	Checked
+noBake_qty	int	Checked
+Main_Core	varchar(255)	Checked
+Side_Core	varchar(255)	Checked
+Loose_Core	varchar(255)	Checked
+Chaplets_COPE	varchar(255)	Checked
+Chaplets_DRAG	varchar(255)	Checked
+Chills_COPE	varchar(255)	Checked
+Chills_DRAG	varchar(255)	Checked
+Mould_Vents_Size	varchar(255)	Checked
+Mould_Vents_No	varchar(255)	Checked
+
+REMOVED
+
+Good_Wt_Per_Box	varchar(255)	Checked
+Sleeve_Size	varchar(255)	Checked
+No_Of_Sleeves	varchar(255)	Checked
+No_Of_BoxesPer_Heat	varchar(255)	Checked
+Filter_Size	varchar(255)	Checked
+No_Of_Filters	varchar(255)	Checked
+Moulding_Type	varchar(255)	Checked
+No_Of_Cores	varchar(255)	Checked
+Shell_Core	varchar(255)	Checked
+Cold_Box	varchar(255)	Checked
+Chill_Used	varchar(255)	Checked
+Chaplet	varchar(255)	Checked
+Comment	varchar(255)	Checked
+Customer_Tooling_Inv_No	varchar(255)	Checked
+		Unchecked
+
+NEW
+
+PatternId	numeric(18, 0)	Unchecked PRIMARY KEY
+PatternNo	varchar(255)	Checked
+Customer	numeric(18, 0)	Unchecked
+Part_No	numeric(18, 0)	Unchecked
+Product_Name	numeric(18, 0)	Unchecked
+No_Of_Cavities	varchar(255)	Checked
+Total_Weight	varchar(255)	Checked
+Asset_No	varchar(255)	Checked
+Customer_Po_No	varchar(255)	Checked
+Tooling_PO_Date	date	Checked
+Purchase_No	varchar(255)	Checked
+Purchase_Date	date	Checked
+Quoted_Estimated_Weight	varchar(255)	Checked
+Pattern_Maker	numeric(18, 0)	Unchecked
+Pattern_Material_Details	varchar(255)	Checked
+No_Of_Patterns_Set	varchar(255)	Checked
+Pattern_Pieces	varchar(255)	Checked
+Rack_Location	varchar(255)	Checked
+Core_Box_Material_Details	varchar(255)	Checked
+Core_Box_Location	varchar(255)	Checked
+Core_Box_S7_F4_No	varchar(255)	Checked
+Core_Box_S7_F4_Date	date	Checked
+No_Of_Core_Box_Set	varchar(255)	Checked
+Core_Box_Pieces	varchar(255)	Checked
+Core_Wt	varchar(255)	Checked
+shell_qty	int	Checked
+coldBox_qty	int	Checked
+noBake_qty	int	Checked
+Main_Core	varchar(255)	Checked
+Side_Core	varchar(255)	Checked
+Loose_Core	varchar(255)	Checked
+Casting_Material_Grade	varchar(255)	Checked
+Moulding_Box_Size	varchar(255)	Checked
+Bunch_Wt	varchar(255)	Checked
+YieldPercent	varchar(255)	Checked
+Chaplets_COPE	varchar(255)	Checked
+Chaplets_DRAG	varchar(255)	Checked
+Chills_COPE	varchar(255)	Checked
+Chills_DRAG	varchar(255)	Checked
+Mould_Vents_Size	varchar(255)	Checked
+Mould_Vents_No	varchar(255)	Checked
+		Unchecked

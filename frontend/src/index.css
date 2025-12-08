@@ -1,0 +1,211 @@
+@import './styles/tokens.css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Inter', sans-serif;
+
+  /* Colors */
+  --color-bg: #F3F4F6;
+  --color-surface: #FFFFFF;
+  --color-primary: #111827;
+  --color-primary-hover: #374151;
+  --color-accent: #2563EB;
+  --color-accent-hover: #1D4ED8;
+  --color-text-main: #111827;
+  --color-text-secondary: #6B7280;
+  --color-border: #E5E7EB;
+  --color-danger: #EF4444;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Responsive Breakpoints */
+  --breakpoint-mobile: 480px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1024px;
+  --breakpoint-wide: 1280px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Utility Classes */
+.card {
+  background: var(--color-surface);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  padding: var(--spacing-lg);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.btn-accent:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+/* Mobile First Approach - Base styles are for mobile */
+
+/* Ensure minimum touch target size for mobile (44x44px) */
+@media (max-width: 767px) {
+
+  /* Typography adjustments for mobile */
+  body {
+    font-size: 14px;
+  }
+
+  /* Buttons - ensure touch-friendly size */
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.625rem 1rem;
+  }
+
+  /* Input fields - touch-friendly */
+  .input-field {
+    min-height: 44px;
+    font-size: 16px;
+    /* Prevents zoom on iOS */
+  }
+
+  /* Cards - reduce padding on mobile */
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  /* Reduce spacing on mobile */
+  :root {
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.25rem;
+  }
+}
+
+/* Tablet styles */
+@media (min-width: 768px) and (max-width: 1023px) {
+  body {
+    font-size: 15px;
+  }
+}
+
+/* Desktop and above - default styles apply */
+@media (min-width: 1024px) {
+  body {
+    font-size: 16px;
+  }
+}
+
+/* ========================================
+   ACCESSIBILITY - FOCUS INDICATORS
+   ======================================== */
+
+/* Visible focus indicators for keyboard navigation */
+*:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Skip link for screen readers */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-accent);
+  color: white;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  z-index: 10000;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 0;
+}
