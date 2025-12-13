@@ -11,14 +11,14 @@ import ChapletsChillsSection from './pattern-master/ChapletsChillsSection';
 import MouldingSection from './pattern-master/MouldingSection';
 import CastingSection from './pattern-master/CastingSection';
 import SleevesSection from './pattern-master/SleevesSection';
+import PartsTable from './pattern-master/PartsTable';
+import SleevesTable from './pattern-master/SleevesTable';
+import PatternReturnSection from './pattern-master/PatternReturnSection';
+
 import AdditionalSection from './pattern-master/AdditionalSection';
-// import * as Tabs from '@radix-ui/react-tabs'; // Removed
-// import './PatternMasterTabs.css'; // Removed
 import AlertDialog from './common/AlertDialog';
-import { createColumnHelper } from '@tanstack/react-table';
-import DataTable from './common/DataTable';
-import TableSkeleton from './common/TableSkeleton'; // Added
-import TextTooltip from './common/TextTooltip'; // Added
+import TableSkeleton from './common/TableSkeleton';
+import TextTooltip from './common/TextTooltip';
 
 const PatternMaster = () => {
     // Split State for Performance
@@ -41,7 +41,8 @@ const PatternMaster = () => {
         Pattern_Material_Details: '',
         No_Of_Patterns_Set: '',
         Pattern_Pieces: '',
-        Rack_Location: ''
+        Rack_Location: '',
+        Box_Per_Heat: ''
     });
 
     const [coreBoxData, setCoreBoxData] = useState({
@@ -129,6 +130,7 @@ const PatternMaster = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchQuery, setSearchQuery] = useState(''); // The active query for the API
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger for sub-tables refresh
 
     // Dynamic parts rows state
     const [partRows, setPartRows] = useState([
@@ -180,6 +182,7 @@ const PatternMaster = () => {
         onSuccess: (data) => {
             toast.success(`Pattern added successfully! Pattern ID: ${data.data.patternId}`);
             queryClient.invalidateQueries(['patterns']);
+            setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
@@ -194,6 +197,7 @@ const PatternMaster = () => {
         onSuccess: (data, variables) => {
             toast.success(`Pattern updated successfully! Pattern ID: ${variables.id}`);
             queryClient.invalidateQueries(['patterns']);
+            setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
@@ -208,6 +212,7 @@ const PatternMaster = () => {
         onSuccess: () => {
             toast.success('Pattern deleted successfully!');
             queryClient.invalidateQueries(['patterns']);
+            setRefreshTrigger(prev => prev + 1);
             setSelectedId(null);
             setIsEditing(false);
             setShowDeleteDialog(false);
@@ -271,7 +276,8 @@ const PatternMaster = () => {
                 Pattern_Material_Details: data.Pattern_Material_Details || '',
                 No_Of_Patterns_Set: data.No_Of_Patterns_Set || '',
                 Pattern_Pieces: data.Pattern_Pieces || '',
-                Rack_Location: data.Rack_Location || ''
+                Rack_Location: data.Rack_Location || '',
+                Box_Per_Heat: data.Box_Per_Heat || ''
             });
 
             // Populate Core Box Details
@@ -407,7 +413,7 @@ const PatternMaster = () => {
         });
         setPatternData({
             Quoted_Estimated_Weight: '', Pattern_Maker: null, Pattern_Material_Details: '',
-            No_Of_Patterns_Set: '', Pattern_Pieces: '', Rack_Location: ''
+            No_Of_Patterns_Set: '', Pattern_Pieces: '', Rack_Location: '', Box_Per_Heat: ''
         });
         setCoreBoxData({
             Core_Box_Material_Details: '', Core_Box_Location: '',
@@ -686,32 +692,7 @@ const PatternMaster = () => {
         }
     };
 
-    // Define columns for DataTable
-    const columnHelper = createColumnHelper();
 
-    const columns = [
-        columnHelper.accessor('PatternId', { header: 'ID', size: 60 }),
-        columnHelper.accessor('PatternNo', { header: 'Pattern No', size: 120 }),
-        columnHelper.accessor('CustomerName', {
-            header: 'Customer',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Serial_No', { header: 'Serial No', size: 100 }),
-        columnHelper.accessor('Part_No', { header: 'Part No', size: 100 }),
-        columnHelper.accessor('Product_Name', {
-            header: 'Product Name',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Pattern_Maker_Name', {
-            header: 'Pattern Maker',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Pattern_Material_Details', { header: 'Material', size: 100 }),
-        columnHelper.accessor('No_Of_Patterns_Set', { header: 'No of Set', size: 120 }),
-    ];
 
     return (
         <div className="card">
@@ -828,14 +809,164 @@ const PatternMaster = () => {
                 <h3 className="section-title gray">Pattern Records ({patterns.length} patterns)</h3>
 
                 {isQueryLoading ? (
-                    <TableSkeleton rows={10} columns={12} />
+                    <TableSkeleton rows={10} columns={30} />
                 ) : (
-                    <DataTable
-                        data={patterns}
-                        columns={columns}
-                        onRowClick={handleRowClick}
-                        selectedId={selectedId}
-                    />
+                    <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
+                                <tr>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pattern No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Customer</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Serial No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Part No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Product Name</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Asset No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Customer PO</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>PO Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Purchase No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Purchase Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pattern Maker</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Material</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Est. Weight</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Set</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pieces</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Rack Loc</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Box Per Heat</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Mat</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Loc</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>S7/F4 No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>S7/F4 Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Sets</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Pieces</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Total Wt</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Type</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Main Core</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Side Core</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Loose Core</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chaplets COPE</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chaplets DRAG</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chills COPE</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chills DRAG</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mould Vents Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mould Vents No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Shell Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>ColdBox Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>NoBake Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>MainCore Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>SideCore Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>LooseCore Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Breaker Core Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Down Sprue Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Foam Filter Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Sand Riser Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Sand Riser</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Ingate Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Ingate</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Runner Bar Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Runner Bar No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Rev No Status</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Comment</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Box Size</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Cavities</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Bunch Wt</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Yield %</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Wt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {patterns.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={60} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                                            No records found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    patterns.map((pattern) => (
+                                        <tr
+                                            key={pattern.PatternId}
+                                            onClick={() => handleRowClick(pattern)}
+                                            style={{
+                                                cursor: 'pointer',
+                                                backgroundColor: selectedId === pattern.PatternId ? '#DBEAFE' : 'white',
+                                                transition: 'background-color 0.15s'
+                                            }}
+                                            onMouseEnter={(e) => { if (selectedId !== pattern.PatternId) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
+                                            onMouseLeave={(e) => { if (selectedId !== pattern.PatternId) e.currentTarget.style.backgroundColor = 'white'; }}
+                                        >
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.PatternId}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.PatternNo}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={pattern.CustomerName} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Serial_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Part_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={pattern.Product_Name} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Asset_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Customer_Po_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Tooling_PO_Date ? pattern.Tooling_PO_Date.split('T')[0] : ''}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Purchase_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Purchase_Date ? pattern.Purchase_Date.split('T')[0] : ''}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={pattern.Pattern_Maker_Name} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Pattern_Material_Details}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Quoted_Estimated_Weight}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Patterns_Set}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Pattern_Pieces}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Rack_Location}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Box_Per_Heat}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Material_Details}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Location}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_S7_F4_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_S7_F4_Date ? pattern.Core_Box_S7_F4_Date.split('T')[0] : ''}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Core_Box_Set}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Pieces}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Total_Weight}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Type}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Main_Core}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Side_Core}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Loose_Core}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chaplets_COPE}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chaplets_DRAG}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chills_COPE}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chills_DRAG}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Mould_Vents_Size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Mould_Vents_No}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.shell_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.coldBox_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.noBake_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.mainCore_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.sideCore_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.looseCore_qty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.breaker_core_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.down_sprue_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.foam_filter_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.sand_riser_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.no_of_sand_riser}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.ingate_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.no_of_ingate}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.runner_bar_size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.runner_bar_no}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.rev_no_status}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.date ? pattern.date.split('T')[0] : ''}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={pattern.comment} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Moulding_Box_Size}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Cavities}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Bunch_Wt}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.YieldPercent}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Wt}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
 
                 {selectedId && (
@@ -844,6 +975,15 @@ const PatternMaster = () => {
                     </div>
                 )}
             </div>
+
+            {/* Parts Records Table */}
+            <PartsTable searchQuery={searchQuery} refreshTrigger={refreshTrigger} />
+
+            {/* Sleeves Records Table */}
+            <SleevesTable searchQuery={searchQuery} refreshTrigger={refreshTrigger} />
+
+            {/* Pattern Return History Section */}
+            <PatternReturnSection />
 
             <AlertDialog
                 isOpen={showDeleteDialog}

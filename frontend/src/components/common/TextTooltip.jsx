@@ -3,11 +3,13 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import './TextTooltip.css';
 
 const TextTooltip = ({ text, maxLength = 30 }) => {
-    if (!text || text.length <= maxLength) {
+    const stringText = String(text ?? '');
+
+    if (!stringText || stringText.length <= maxLength) {
         return <span>{text}</span>;
     }
 
-    const truncatedText = `${text.substring(0, maxLength)}...`;
+    const truncatedText = `${stringText.substring(0, maxLength)}...`;
 
     return (
         <Tooltip.Provider>

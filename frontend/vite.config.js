@@ -6,13 +6,8 @@ export default defineConfig({
   plugins: [react()],
   build: {
     // Optimize output
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console.logs in production
-        drop_debugger: true
-      }
-    },
+    // minify: 'terser', // Removed to use default esbuild (terser requires separate install)
+    
     // Code splitting strategy
     rollupOptions: {
       output: {
@@ -40,6 +35,13 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false
+      }
+    },
     // Enable HMR
     hmr: {
       overlay: true

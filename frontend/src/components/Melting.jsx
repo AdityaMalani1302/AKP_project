@@ -1,17 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { createColumnHelper } from '@tanstack/react-table';
 import api from '../api';
-import DataTable from './common/DataTable';
 import TableSkeleton from './common/TableSkeleton';
-import TextTooltip from './common/TextTooltip';
 
 const fetchRecords = async () => {
     const response = await api.get('/lab-master');
     return response.data;
 };
-
-const columnHelper = createColumnHelper();
 
 const Melting = () => {
     const [selectedDrgNo, setSelectedDrgNo] = useState('');
@@ -30,81 +25,6 @@ const Melting = () => {
         if (!selectedDrgNo) return [];
         return allRecords.filter(record => record.DrgNo === selectedDrgNo);
     }, [allRecords, selectedDrgNo]);
-
-    const columns = useMemo(() => [
-        columnHelper.accessor('LabMasterId', {
-            header: 'ID',
-            size: 60,
-            minWidth: 60,
-        }),
-        columnHelper.accessor('Customer', {
-            header: 'Customer',
-            size: 150,
-            minWidth: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={15} />
-        }),
-        columnHelper.accessor('DrgNo', {
-            header: 'Drg No',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('Description', {
-            header: 'Description',
-            size: 200,
-            minWidth: 200,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Grade', {
-            header: 'Grade',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('PartWeight', {
-            header: 'Part Wt',
-            size: 100,
-            minWidth: 100,
-            meta: { isNumeric: true }
-        }),
-        columnHelper.accessor('MinMaxThickness', {
-            header: 'Min/Max Thk',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('ThicknessGroup', {
-            header: 'Thk Group',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('BaseChe_C', { header: 'Base C', size: 80, minWidth: 80 }),
-        columnHelper.accessor('BaseChe_Si', { header: 'Base Si', size: 80, minWidth: 80 }),
-        columnHelper.accessor('C', { header: 'C', size: 80, minWidth: 80 }),
-        columnHelper.accessor('Si', { header: 'Si', size: 80, minWidth: 80 }),
-        columnHelper.accessor('Mn', { header: 'Mn', size: 80, minWidth: 80 }),
-        columnHelper.accessor('P', { header: 'P', size: 80, minWidth: 80 }),
-        columnHelper.accessor('S', { header: 'S', size: 80, minWidth: 80 }),
-        columnHelper.accessor('Cr', { header: 'Cr', size: 80, minWidth: 80 }),
-        columnHelper.accessor('Cu', { header: 'Cu', size: 80, minWidth: 80 }),
-        columnHelper.accessor('Mg_Chem', {
-            header: 'Mg',
-            size: 80,
-            minWidth: 80,
-            cell: info => info.getValue() || info.row.original.Mg // Fallback
-        }),
-        columnHelper.accessor('CE', { header: 'CE', size: 80, minWidth: 80 }),
-        columnHelper.accessor('CRCA', { header: 'CRCA', size: 100, minWidth: 100 }),
-        columnHelper.accessor('RR', { header: 'RR', size: 100, minWidth: 100 }),
-        columnHelper.accessor('PIG', { header: 'PIG', size: 100, minWidth: 100 }),
-        columnHelper.accessor('MS', { header: 'MS', size: 100, minWidth: 100 }),
-        columnHelper.accessor('Mg_Mix', { header: 'Mg Mix', size: 100, minWidth: 100 }),
-        columnHelper.accessor('RegularCritical', { header: 'Reg/Crit', size: 120, minWidth: 120 }),
-        columnHelper.accessor('LastBoxTemp', { header: 'Last Box Temp', size: 120, minWidth: 120 }),
-        columnHelper.accessor('Remarks', {
-            header: 'Remarks',
-            size: 200,
-            minWidth: 200,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={25} />
-        }),
-    ], []);
 
     return (
         <div className="card">
@@ -134,13 +54,106 @@ const Melting = () => {
                     <h3 className="section-title gray">Records for Drg No: {selectedDrgNo} ({filteredRecords.length})</h3>
 
                     {isQueryLoading ? (
-                        <TableSkeleton rows={5} columns={20} />
+                        <TableSkeleton rows={5} columns={4} />
+                    ) : filteredRecords.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                            No records found
+                        </div>
                     ) : (
-                        <DataTable
-                            data={filteredRecords}
-                            columns={columns}
-                            maxHeight="600px" // Pass specific height if needed
-                        />
+                        <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', 
+                            gap: '1.5rem',
+                            maxHeight: '700px',
+                            overflowY: 'auto',
+                            padding: '0.5rem'
+                        }}>
+                            {filteredRecords.map((record) => (
+                                <div 
+                                    key={record.LabMasterId} 
+                                    style={{
+                                        backgroundColor: 'white',
+                                        borderRadius: '8px',
+                                        border: '1px solid #E5E7EB',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {/* Card Header */}
+                                    <div style={{
+                                        backgroundColor: '#3B82F6',
+                                        color: 'white',
+                                        padding: '0.75rem 1rem',
+                                        fontWeight: '600',
+                                        fontSize: '0.95rem'
+                                    }}>
+                                        Record #{record.LabMasterId}
+                                    </div>
+                                    
+                                    {/* Card Body - Vertical Layout */}
+                                    <div style={{ padding: '0.5rem 0' }}>
+                                        {[
+                                            { label: 'Customer', value: record.Customer },
+                                            { label: 'Drg No', value: record.DrgNo },
+                                            { label: 'Description', value: record.Description },
+                                            { label: 'Grade', value: record.Grade },
+                                            { label: 'Part Weight', value: record.PartWeight },
+                                            { label: 'Min/Max Thickness', value: record.MinMaxThickness },
+                                            { label: 'Thickness Group', value: record.ThicknessGroup },
+                                            { label: 'Base C', value: record.BaseChe_C },
+                                            { label: 'Base Si', value: record.BaseChe_Si },
+                                            { label: 'C', value: record.C },
+                                            { label: 'Si', value: record.Si },
+                                            { label: 'Mn', value: record.Mn },
+                                            { label: 'P', value: record.P },
+                                            { label: 'S', value: record.S },
+                                            { label: 'Cr', value: record.Cr },
+                                            { label: 'Cu', value: record.Cu },
+                                            { label: 'Mg', value: record.Mg_Chem || record.Mg },
+                                            { label: 'CE', value: record.CE },
+                                            { label: 'CRCA', value: record.CRCA },
+                                            { label: 'RR', value: record.RR },
+                                            { label: 'PIG', value: record.PIG },
+                                            { label: 'MS', value: record.MS },
+                                            { label: 'Mg Mix', value: record.Mg_Mix },
+                                            { label: 'Regular/Critical', value: record.RegularCritical },
+                                            { label: 'Last Box Temp', value: record.LastBoxTemp },
+                                            { label: 'Remarks', value: record.Remarks },
+                                        ].map((item, idx) => (
+                                            <div 
+                                                key={idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    padding: '0.5rem 1rem',
+                                                    backgroundColor: idx % 2 === 0 ? '#F9FAFB' : 'white',
+                                                    borderBottom: '1px solid #F3F4F6',
+                                                    fontSize: '0.875rem'
+                                                }}
+                                            >
+                                                <span style={{ 
+                                                    fontWeight: '500', 
+                                                    color: '#374151',
+                                                    minWidth: '120px'
+                                                }}>
+                                                    {item.label}
+                                                </span>
+                                                <span style={{ 
+                                                    color: '#1F2937',
+                                                    textAlign: 'right',
+                                                    maxWidth: '200px',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {item.value || '-'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
             )}

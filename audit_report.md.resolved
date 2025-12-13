@@ -1,0 +1,82 @@
+# Hostile Code Audit Report
+
+**PROJECT:** AKP_project
+**CONTEXT:** JavaScript (Node.js/Express v5, React v19), SQL Server, Windows Deployment
+**AUDITOR:** Antigravity (SRE/Security Architect)
+**DATE:** 2025-12-09
+
+---
+
+## 1. EXISTENTIAL RISKS (CRITICAL)
+1.  **SQL Injection (High Confidence):** Multiple search endpoints (`/api/customers`, `/api/products`) use direct string concatenation with user input (`LIKE '%${search}%'`), allowing full database compromise.
+2.  **Weak Cryptographic Secrets:** `JWT_SECRET` is hardcoded to a default value (`"your_secure_random_production_key"`) in [.env](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/.env), allowing trivial token forgery and account takeover.
+3.  **Insecure Database Transport:** [config/db.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/config/db.js) explicitly sets `encrypt: false` and `trustServerCertificate: true`, enabling Man-in-the-Middle (MitM) attacks on the LAN.
+
+## 2. HIGH SEVERITY BUGS & VULNERABILITIES
+
+### [HIGH] SQL Injection in Search Endpoints
+**Location:** [backend/server.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js) (Lines 314, 343, 370)
+**Vulnerability:** Unsanitized user input `req.query.search` is directly concatenated into SQL queries.
+**Proof of Concept (PoC):**
+```http
+GET /api/customers?search=' OR 1=1 --
+```
+**Impact:** Attacker can dump `Customer`, `Product`, and `User` tables or execute arbitrary commands if DB permissions are loose.
+**CVSS 3.1 Score:** 9.8 (Critical) - AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
+### [HIGH] Hardcoded & Weak Secrets
+**Location:** [backend/.env](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/.env) (Line 3), [backend/server.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js) (Lines 13-18)
+**Vulnerability:** Production secret is committed to source control/history and is a known default.
+**Impact:** Anyone with this key can sign their own Admin JWTs and bypass all [verifyToken](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js#46-59) checks.
+
+### [HIGH] Denial of Service (DoS) via Type Confusion
+**Location:** [backend/server.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js) (Line 79)
+**Code:** `allowedPages.join(',')`
+**Vulnerability:** Input `allowedPages` is assumed to be an array. If an attacker sends a string or object (even if authenticated as non-admin, or if validation is bypassed), this throws a 500 Uncaught Exception, potentially crashing the Node process if not caught by a global handler.
+
+## 3. MEDIUM SEVERITY & RELIABILITY RISKS
+
+-   **No Connection Retry Logic:** [connectSQL](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/config/db.js#25-41) (Lines 25-40) attempts to connect once at startup. If SQL Server is initializing (common on Windows restarts), the backend starts with empty pools and crashes on the first request.
+-   **Missing Helmet CSP:** `helmet()` is used but Content Security Policy (CSP) is not configured, leaving frontend vulnerable to XSS if an attacker can inject scripts (e.g., via `ProductName` stored XSS).
+-   **No Rate Limiting:** No `express-rate-limit` middleware. Brute-force attacks on `/api/auth/login` are trivial.
+-   **No Transaction Timeouts:** While `requestTimeout` is set to 60s, there is no application-level logic to handle "stuck" transactions if the node process dies mid-transaction (though SQL Server will eventually rollback).
+
+## 4. BUG DENSITY & CODE HEALTH
+
+-   **God Object Anti-Pattern:** [server.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js) is ~1400 lines containing all config, middleware, routes, and business logic. This makes testing and maintenance near-impossible.
+-   **Cyclomatic Complexity:** > 50 in `api/pattern-master` handlers due to massive destructuring and conditional logic.
+-   **Magic Strings:** SQL queries are scattered as string literals throughout the codebase instead of being centralized in a Data Access Layer (DAL) or ORM.
+-   **Deprecated/Dead Code:** References to `// SQL_DATABASE=IcSoft # Deprecated` and commented-out logic clutter the codebase.
+
+## 5. PERFORMANCE & SCALABILITY
+
+-   **N+1 Query Risk:** The `/api/pattern-master` (Get all) query joins `Customer` and `Supplier` correctly, but if `api/tables/:tableName` is used for large tables with high offsets (`ROW_NUMBER()` pagination), performance will degrade linearly (O(N)).
+-   **Oversized Payloads:** `SELECT *` is used frequently (lines 689, 702). Fetching all columns (including potentially large text/blobs) for summary views wastes bandwidth.
+-   **Blocking Operations:** `bcrypt.hash` (Line 82) is async (good), but massive `JSON.stringify`/parsing or large array maps in the main thread will block the event loop.
+
+## 6. OBSERVABILITY & OPERATIONS
+
+-   **Logging:** Uses `console.log/error`. In production, these logs are often lost or unstructured. No correlation IDs between requests and DB queries.
+-   **Metrics:** Zero instrumentation. You cannot know if the server is slow, erroring, or under attack without manual log grepping.
+-   **Deployment:** `npm start` runs `node server.js`. No Process Manager (PM2) configured to restart on crash.
+
+---
+
+## 7. RECOMMENDATIONS
+
+### IMMEDIATE ACTIONS (P0 - Fix Today)
+1.  **Security:** Replace all `LIKE '%${search}%'` with parameterized queries using `sql.NVarChar`.
+    *   *Change:* `query += ' WHERE CustName LIKE @search';` and `request.input('search', sql.NVarChar, '%' + search + '%');`
+2.  **Security:** Rotate `JWT_SECRET` in [.env](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/.env) and remove it from git tracking. Use a random 64-char string.
+3.  **Reliability:** Add a `while` loop with sleep in [connectSQL](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/config/db.js#25-41) to retry connections for up to 30 seconds.
+
+### SHORT TERM (P1 - This Week)
+1.  **Refactor:** Split [server.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/server.js) into `routes/*.js` and `controllers/*.js`.
+2.  **Validation:** Install `zod` or `joi` and validate ALL incoming `req.body` and `req.query` data before it touches the database.
+3.  **Security:** Enable `encrypt: true` in [db.js](file:///c:/Users/adity/OneDrive/Desktop/AKP_project/backend/config/db.js) and configure a self-signed cert on SQL Server if strictly local, or trust the server cert explicitly only if necessary.
+
+### ARCHITECTURAL FEEDBACK
+The current "Monolithic Script" architecture is suitable for a prototype but dangerous for an ERP system. The lack of a Data Access Layer means security logic (sanitization) is duplicated and often missed. Transition to a Layered Architecture (Controller -> Service -> Data Access).
+
+**OPERATIONAL SCORE:** 3/10
+*Functional but fragile and insecure.*

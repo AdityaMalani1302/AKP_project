@@ -25,7 +25,7 @@ const AdditionalSection = ({ data, onChange }) => {
                     <input
                         type="date"
                         name="date"
-                        value={data.date}
+                        value={data.date ? data.date.split('T')[0] : ''}
                         onChange={onChange}
                         style={inputStyle}
                     />

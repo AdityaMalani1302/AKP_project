@@ -15,7 +15,11 @@ const Login = ({ setToken, setUser }) => {
             const res = await api.post('/auth/login', { username, password });
             if (res.data.success) {
                 toast.success('Login successful!');
-                setUser({ username: res.data.username, role: res.data.role });
+                setUser({ 
+                    username: res.data.username, 
+                    role: res.data.role,
+                    allowedPages: res.data.allowedPages || []
+                });
                 navigate('/');
             }
         } catch (err) {

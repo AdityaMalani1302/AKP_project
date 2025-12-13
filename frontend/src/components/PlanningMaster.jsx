@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { createColumnHelper } from '@tanstack/react-table';
 import api from '../api';
 import { validatePlanningMaster } from '../utils/validation';
 import '../App.css';
 import AlertDialog from './common/AlertDialog';
-import DataTable from './common/DataTable';
-import TableSkeleton from './common/TableSkeleton'; // Added
-import TextTooltip from './common/TextTooltip'; // Added
+import TableSkeleton from './common/TableSkeleton';
+import TextTooltip from './common/TextTooltip';
+import PlanningEntry from './PlanningEntry';
 
 const PlanningMaster = () => {
     const [formData, setFormData] = useState({
@@ -24,6 +23,7 @@ const PlanningMaster = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [errors, setErrors] = useState({});
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' or 'entry'
 
     // Frozen date - using ref for immediate access (persists until page refresh)
     const frozenDateRef = useRef(null);
@@ -40,45 +40,11 @@ const PlanningMaster = () => {
     const itemDropdownRef = useRef(null);
     const customerDropdownRef = useRef(null);
 
-    const columnHelper = createColumnHelper();
-
     const formatDate = (dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
         return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     };
-
-    const columns = useMemo(() => [
-        columnHelper.accessor('ID', {
-            header: 'ID',
-            size: 60,
-            minWidth: 60,
-        }),
-        columnHelper.accessor('ItemCode', {
-            header: 'Item Code',
-            size: 150,
-            minWidth: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('CustomerName', {
-            header: 'Customer Name',
-            size: 200,
-            minWidth: 200,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={25} />
-        }),
-        columnHelper.accessor('ScheduleQty', {
-            header: 'Qty',
-            size: 100,
-            minWidth: 100,
-            cell: info => <div style={{ textAlign: 'right' }}>{info.getValue()}</div>,
-        }),
-        columnHelper.accessor('PlanDate', {
-            header: 'Plan Date',
-            size: 120,
-            minWidth: 120,
-            cell: info => <div style={{ textAlign: 'center' }}>{formatDate(info.getValue())}</div>,
-        }),
-    ], []);
 
     useEffect(() => {
         fetchCustomers();
@@ -329,8 +295,49 @@ const PlanningMaster = () => {
 
     return (
         <div className="card">
-            <h2 style={{ marginBottom: '1.5rem' }}>Planning Schedule Qty</h2>
+            <h2 style={{ marginBottom: '1.5rem' }}>Planning</h2>
 
+            {/* Tab Navigation */}
+            <div style={{ display: 'flex', gap: '0', marginBottom: '1.5rem', borderBottom: '2px solid #E5E7EB' }}>
+                <button
+                    onClick={() => setActiveTab('schedule')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        border: 'none',
+                        backgroundColor: activeTab === 'schedule' ? '#3B82F6' : 'transparent',
+                        color: activeTab === 'schedule' ? 'white' : '#6B7280',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        borderRadius: '0.5rem 0.5rem 0 0',
+                        transition: 'all 0.2s',
+                        fontSize: '0.875rem'
+                    }}
+                >
+                    Planning Schedule Qty
+                </button>
+                <button
+                    onClick={() => setActiveTab('entry')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        border: 'none',
+                        backgroundColor: activeTab === 'entry' ? '#3B82F6' : 'transparent',
+                        color: activeTab === 'entry' ? 'white' : '#6B7280',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        borderRadius: '0.5rem 0.5rem 0 0',
+                        transition: 'all 0.2s',
+                        fontSize: '0.875rem'
+                    }}
+                >
+                    Planning Entry
+                </button>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'entry' ? (
+                <PlanningEntry />
+            ) : (
+                <>
             <div className="section-container section-blue" style={{ marginBottom: '1.5rem' }}>
                 <h3 className="section-title blue">
                     {isEditing ? `Editing Schedule ID: ${selectedId}` : 'Schedule Details'}
@@ -450,12 +457,52 @@ const PlanningMaster = () => {
                 {isQueryLoading ? (
                     <TableSkeleton rows={10} columns={5} />
                 ) : (
-                    <DataTable
-                        data={schedules}
-                        columns={columns}
-                        onRowClick={handleRowClick}
-                        selectedId={selectedId}
-                    />
+                    <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
+                                <tr>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>Item Code</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>Customer Name</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap' }}>Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap' }}>Plan Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {schedules.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                                            No records found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    schedules.map((schedule) => (
+                                        <tr
+                                            key={schedule.ID}
+                                            onClick={() => handleRowClick(schedule)}
+                                            style={{
+                                                cursor: 'pointer',
+                                                backgroundColor: selectedId === schedule.ID ? '#DBEAFE' : 'white',
+                                                transition: 'background-color 0.15s'
+                                            }}
+                                            onMouseEnter={(e) => { if (selectedId !== schedule.ID) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
+                                            onMouseLeave={(e) => { if (selectedId !== schedule.ID) e.currentTarget.style.backgroundColor = 'white'; }}
+                                        >
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{schedule.ID}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={schedule.ItemCode} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={schedule.CustomerName} maxLength={25} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap' }}>{schedule.ScheduleQty}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDate(schedule.PlanDate)}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
 
                 {selectedId && (
@@ -474,6 +521,8 @@ const PlanningMaster = () => {
                 confirmText="Delete"
                 isDanger={true}
             />
+            </>
+            )}
         </div>
     );
 };

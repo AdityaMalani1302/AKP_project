@@ -89,6 +89,9 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
                         <option value="">Select Pattern Set</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
                         <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
+                        <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
+                        <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
                     </select>
                 </div>
 
@@ -103,6 +106,9 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
                         <option value="">Select Pattern Pieces</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
                         <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
+                        <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
+                        <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
                     </select>
                 </div>
 
@@ -115,6 +121,18 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
                         onChange={onChange}
                         style={inputStyle}
                         placeholder="Enter rack location"
+                    />
+                </div>
+
+                <div>
+                    <label style={labelStyle}>Box Per Heat</label>
+                    <input
+                        type="text"
+                        name="Box_Per_Heat"
+                        value={data.Box_Per_Heat}
+                        onChange={onChange}
+                        style={inputStyle}
+                        placeholder="Enter box per heat"
                     />
                 </div>
             </div>

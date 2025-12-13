@@ -1,13 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { createColumnHelper } from '@tanstack/react-table';
 import Select from 'react-select';
 import { toast } from 'sonner';
 import api from '../api';
-import DataTable from './common/DataTable';
 import TableSkeleton from './common/TableSkeleton';
-
-const columnHelper = createColumnHelper();
 
 const fetchTables = async () => {
     const res = await api.get('/tables');
@@ -51,23 +47,10 @@ const DatabaseExplorer = () => {
     const totalPages = Math.ceil(total / limit);
     const tableOptions = tables.map(t => ({ value: t, label: t }));
 
-    // Dynamic Columns
-    const columns = useMemo(() => {
+    // Dynamic Columns from data
+    const columnKeys = useMemo(() => {
         if (!rows || rows.length === 0) return [];
-        const firstRow = rows[0];
-        return Object.keys(firstRow).map(key =>
-            columnHelper.accessor(key, {
-                header: key,
-                size: 150,
-                minWidth: 100,
-                cell: info => {
-                    const val = info.getValue();
-                    if (val === null) return <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>null</span>;
-                    if (typeof val === 'object') return JSON.stringify(val);
-                    return String(val);
-                }
-            })
-        );
+        return Object.keys(rows[0]);
     }, [rows]);
 
     const handleTableChange = (selectedOption) => {
@@ -79,6 +62,9 @@ const DatabaseExplorer = () => {
         if (newPage < 1 || newPage > totalPages) return;
         setPage(newPage);
     };
+
+    const thStyle = { padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' };
+    const tdStyle = { padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' };
 
     return (
         <div className="card">
@@ -197,11 +183,35 @@ const DatabaseExplorer = () => {
                             No data found in this table.
                         </div>
                     ) : (
-                        <DataTable
-                            data={rows}
-                            columns={columns}
-                            maxHeight="500px"
-                        />
+                        <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                                    <tr>
+                                        {columnKeys.map(key => (
+                                            <th key={key} style={thStyle}>{key}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, rowIndex) => (
+                                        <tr key={rowIndex} style={{ backgroundColor: 'white' }}>
+                                            {columnKeys.map(key => {
+                                                const val = row[key];
+                                                let displayVal;
+                                                if (val === null) {
+                                                    displayVal = <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>null</span>;
+                                                } else if (typeof val === 'object') {
+                                                    displayVal = JSON.stringify(val);
+                                                } else {
+                                                    displayVal = String(val);
+                                                }
+                                                return <td key={key} style={tdStyle}>{displayVal}</td>;
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             )}

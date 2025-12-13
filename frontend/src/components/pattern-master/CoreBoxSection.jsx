@@ -48,6 +48,9 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                         <option value="">Select Core Box Set</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
                         <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
+                        <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
+                        <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
                     </select>
                 </div>
 
@@ -62,6 +65,9 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                         <option value="">Select Core Box Pieces</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
                         <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
+                        <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
+                        <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
                     </select>
                 </div>
 
@@ -84,7 +90,7 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                     <input
                         type="date"
                         name="Core_Box_S7_F4_Date"
-                        value={data.Core_Box_S7_F4_Date || ''}
+                        value={data.Core_Box_S7_F4_Date ? data.Core_Box_S7_F4_Date.split('T')[0] : ''}
                         onChange={onChange}
                         style={inputStyle}
                     />

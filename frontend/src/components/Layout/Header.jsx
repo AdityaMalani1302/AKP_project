@@ -19,9 +19,9 @@ const Header = ({ user, onMenuClick }) => {
             }}
             role="banner"
         >
-            {/* Left Section - Hamburger + Title */}
+            {/* Left Section - Sidebar Toggle + Title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {/* Hamburger Menu - Mobile Only */}
+                {/* Sidebar Toggle Button */}
                 <button
                     onClick={onMenuClick}
                     style={{
@@ -31,11 +31,12 @@ const Header = ({ user, onMenuClick }) => {
                         cursor: 'pointer',
                         color: '#6B7280',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        borderRadius: '0.375rem',
+                        transition: 'background-color 0.2s'
                     }}
-                    className="mobile-menu-button"
-                    aria-label="Open navigation menu"
-                    aria-expanded="false"
+                    className="sidebar-toggle-button"
+                    aria-label="Toggle sidebar"
                 >
                     <FiMenu size={24} />
                 </button>
@@ -47,33 +48,37 @@ const Header = ({ user, onMenuClick }) => {
 
             {/* Right Section */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div className="desktop-only">
-                    <DatabaseSelector />
-                </div>
+                {user?.role === 'admin' && (
+                    <div className="desktop-only">
+                        <DatabaseSelector />
+                    </div>
+                )}
 
-                {/* Search - Desktop Only */}
-                <div className="desktop-only" style={{ position: 'relative' }}>
-                    <label htmlFor="global-search" className="sr-only">Search</label>
-                    <FiSearch
-                        style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}
-                        aria-hidden="true"
-                    />
-                    <input
-                        id="global-search"
-                        type="text"
-                        placeholder="Search..."
-                        style={{
-                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                            borderRadius: '0.375rem',
-                            border: '1px solid #E5E7EB',
-                            outline: 'none',
-                            fontSize: '0.875rem',
-                            width: '240px',
-                            backgroundColor: '#F9FAFB'
-                        }}
-                        aria-label="Global search"
-                    />
-                </div>
+                {/* Search - Desktop Only (Admin only) */}
+                {user?.role === 'admin' && (
+                    <div className="desktop-only" style={{ position: 'relative' }}>
+                        <label htmlFor="global-search" className="sr-only">Search</label>
+                        <FiSearch
+                            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}
+                            aria-hidden="true"
+                        />
+                        <input
+                            id="global-search"
+                            type="text"
+                            placeholder="Search..."
+                            style={{
+                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #E5E7EB',
+                                outline: 'none',
+                                fontSize: '0.875rem',
+                                width: '240px',
+                                backgroundColor: '#F9FAFB'
+                            }}
+                            aria-label="Global search"
+                        />
+                    </div>
+                )}
 
                 {/* Notifications - Desktop Only */}
                 <button
@@ -123,10 +128,8 @@ const Header = ({ user, onMenuClick }) => {
             </div>
 
             <style>{`
-                @media (min-width: 768px) {
-                    .mobile-menu-button {
-                        display: none !important;
-                    }
+                .sidebar-toggle-button:hover {
+                    background-color: #F3F4F6;
                 }
                 @media (max-width: 767px) {
                     .desktop-only {

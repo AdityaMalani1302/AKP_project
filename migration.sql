@@ -27,7 +27,7 @@ IF COL_LENGTH('PatternMaster', 'Chills_DRAG') IS NULL ALTER TABLE PatternMaster 
 IF COL_LENGTH('PatternMaster', 'Mould_Vents_Size') IS NULL ALTER TABLE PatternMaster ADD Mould_Vents_Size VARCHAR(255);
 IF COL_LENGTH('PatternMaster', 'Mould_Vents_No') IS NULL ALTER TABLE PatternMaster ADD Mould_Vents_No VARCHAR(255);
 
--- 2. Create PatternParts table if it doesn't exist
+-- 2. Create PatternCavityMaster table if it doesn't exist
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PatternCavityMaster')
 BEGIN
     CREATE TABLE PatternCavityMaster (

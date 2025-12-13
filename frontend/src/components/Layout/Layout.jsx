@@ -25,6 +25,12 @@ const Layout = ({ children, user, onLogout }) => {
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
     const closeSidebar = () => setSidebarOpen(false);
 
+    // Calculate main content margin
+    // Desktop: 260px (Open) vs 80px (Collapsed)
+    // Mobile: 0 (Fixed Sidebar Overlay)
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+    const mainMargin = isDesktop ? (sidebarOpen ? '260px' : '80px') : '0';
+
     return (
         <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F3F4F6' }}>
             {/* Skip Navigation Link */}
@@ -35,7 +41,7 @@ const Layout = ({ children, user, onLogout }) => {
             <Sidebar user={user} onLogout={onLogout} isOpen={sidebarOpen} onClose={closeSidebar} />
             <div style={{
                 flex: 1,
-                marginLeft: window.innerWidth >= 768 && sidebarOpen ? '260px' : '0',
+                marginLeft: mainMargin,
                 display: 'flex',
                 flexDirection: 'column',
                 transition: 'margin-left 0.3s ease-in-out',

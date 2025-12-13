@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { createColumnHelper } from '@tanstack/react-table';
 import api from '../api';
 import DetailsSection from './lab-master/DetailsSection';
 import ChemistryMixSection from './lab-master/ChemistryMixSection';
 import OthersSection from './lab-master/OthersSection';
 import AlertDialog from './common/AlertDialog';
-import DataTable from './common/DataTable';
-import TableSkeleton from './common/TableSkeleton'; // Added
-import TextTooltip from './common/TextTooltip'; // Added
+import TableSkeleton from './common/TableSkeleton';
+import TextTooltip from './common/TextTooltip';
 
 const LabMaster = () => {
     const [formData, setFormData] = useState({
@@ -43,151 +41,10 @@ const LabMaster = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const fileInputRef = useRef(null);
 
-    const columnHelper = createColumnHelper();
 
-    const columns = useMemo(() => [
-        columnHelper.accessor('LabMasterId', {
-            header: 'ID',
-            size: 60,
-            minWidth: 60,
-        }),
-        columnHelper.accessor('Customer', {
-            header: 'Customer',
-            size: 150,
-            minWidth: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('DrgNo', {
-            header: 'Drg No',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('Description', {
-            header: 'Description',
-            size: 200,
-            minWidth: 200,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={25} />
-        }),
-        columnHelper.accessor('Grade', {
-            header: 'Grade',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('PartWeight', {
-            header: 'Part Wt',
-            size: 100,
-            minWidth: 100,
-            cell: info => <div style={{ textAlign: 'right' }}>{info.getValue()}</div>,
-        }),
-        columnHelper.accessor('MinMaxThickness', {
-            header: 'Min/Max Thickness',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('ThicknessGroup', {
-            header: 'Thickness Group',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('BaseChe_C', {
-            header: 'Base C',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('BaseChe_Si', {
-            header: 'Base Si',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('C', {
-            header: 'C',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('Si', {
-            header: 'Si',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('Mn', {
-            header: 'Mn',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('P', {
-            header: 'P',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('S', {
-            header: 'S',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('Cr', {
-            header: 'Cr',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('Cu', {
-            header: 'Cu',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('Mg_Chem', { // Assuming Mg_Chem based on previous table render logic: record.Mg_Chem || record.Mg
-            header: 'Mg',
-            size: 80,
-            minWidth: 80,
-            cell: info => info.getValue() || info.row.original.Mg,
-        }),
-        columnHelper.accessor('CE', {
-            header: 'CE',
-            size: 80,
-            minWidth: 80,
-        }),
-        columnHelper.accessor('CRCA', {
-            header: 'CRCA',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('RR', {
-            header: 'RR',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('PIG', {
-            header: 'PIG',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('MS', {
-            header: 'MS',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('Mg_Mix', {
-            header: 'Mg Mix',
-            size: 100,
-            minWidth: 100,
-        }),
-        columnHelper.accessor('RegularCritical', {
-            header: 'Regular/Critical',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('LastBoxTemp', {
-            header: 'Last Box Temp',
-            size: 120,
-            minWidth: 120,
-        }),
-        columnHelper.accessor('Remarks', {
-            header: 'Remarks',
-            size: 200,
-            minWidth: 200,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={30} />
-        }),
-    ], []);
 
     const fetchRecordsFromApi = async (query) => {
         const url = query
@@ -346,6 +203,50 @@ const LabMaster = () => {
         }
     };
 
+    const handleImportExcel = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        const validTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel'
+        ];
+        if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+            toast.error('Please select a valid Excel file (.xlsx or .xls)');
+            return;
+        }
+
+        setImporting(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await api.post('/lab-master/import-excel', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const { successCount, errorCount, errors } = response.data;
+            
+            if (errorCount > 0) {
+                toast.warning(`Import completed with ${successCount} records imported and ${errorCount} errors.`);
+                console.log('Import errors:', errors);
+            } else {
+                toast.success(`Successfully imported ${successCount} records!`);
+            }
+            
+            queryClient.invalidateQueries(['labRecords']);
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to import Excel file');
+        } finally {
+            setImporting(false);
+            // Reset the file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
     return (
         <div className="card" >
             <h2 style={{ marginBottom: '1.5rem' }}>Lab Master</h2>
@@ -367,6 +268,24 @@ const LabMaster = () => {
                     )}
                     <button type="button" onClick={handleClear} className="btn btn-secondary">
                         CLEAR
+                    </button>
+                    
+                    {/* Import from Excel */}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImportExcel}
+                        accept=".xlsx,.xls"
+                        style={{ display: 'none' }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={importing}
+                        className="btn"
+                        style={{ backgroundColor: '#059669', color: 'white' }}
+                    >
+                        {importing ? 'Importing...' : '📥 Import from Excel'}
                     </button>
 
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -390,14 +309,100 @@ const LabMaster = () => {
                 <h3 className="section-title gray">Lab Master Records ({records.length})</h3>
 
                 {isQueryLoading ? (
-                    <TableSkeleton rows={10} columns={15} />
+                    <TableSkeleton rows={10} columns={27} />
                 ) : (
-                    <DataTable
-                        data={records}
-                        columns={columns}
-                        onRowClick={handleRowClick}
-                        selectedId={selectedId}
-                    />
+                    <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
+                        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
+                                <tr>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Customer</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Drg No</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Description</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Grade</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Part Wt</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Min/Max Thk</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Thk Group</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Base C</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Base Si</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>C</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Si</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mn</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>P</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>S</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Cr</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Cu</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mg</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>CE</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>CRCA</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>RR</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>PIG</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>MS</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mg Mix</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Regular/Critical</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Last Box Temp</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={27} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                                            No records found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    records.map((record) => (
+                                        <tr
+                                            key={record.LabMasterId}
+                                            onClick={() => handleRowClick(record)}
+                                            style={{
+                                                cursor: 'pointer',
+                                                backgroundColor: selectedId === record.LabMasterId ? '#DBEAFE' : 'white',
+                                                transition: 'background-color 0.15s'
+                                            }}
+                                            onMouseEnter={(e) => { if (selectedId !== record.LabMasterId) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
+                                            onMouseLeave={(e) => { if (selectedId !== record.LabMasterId) e.currentTarget.style.backgroundColor = 'white'; }}
+                                        >
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.LabMasterId}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={record.Customer} maxLength={20} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.DrgNo}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={record.Description} maxLength={25} />
+                                            </td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Grade}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap' }}>{record.PartWeight}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.MinMaxThickness}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.ThicknessGroup}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.BaseChe_C}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.BaseChe_Si}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.C}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Si}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Mn}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.P}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.S}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Cr}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Cu}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Mg_Chem || record.Mg}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.CE}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.CRCA}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.RR}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.PIG}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.MS}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.Mg_Mix}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.RegularCritical}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{record.LastBoxTemp}</td>
+                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                                                <TextTooltip text={record.Remarks} maxLength={30} />
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
 
                 {selectedId && (

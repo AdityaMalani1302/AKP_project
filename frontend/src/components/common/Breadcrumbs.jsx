@@ -9,7 +9,7 @@ const routes = [
     { path: '/lab-master', breadcrumb: 'Lab Master' },
     { path: '/melting', breadcrumb: 'Melting' },
     { path: '/database-explorer', breadcrumb: 'Database Explorer' },
-    { path: '/admin', breadcrumb: 'Admin Dashboard' },
+    { path: '/admin', breadcrumb: 'User Management' },
     // Add more routes as needed
 ];
 

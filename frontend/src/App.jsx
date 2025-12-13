@@ -7,11 +7,13 @@ import Login from './components/Login';
 
 import DatabaseExplorer from './components/DatabaseExplorer';
 import PrivateRoute from './components/PrivateRoute';
-import AdminDashboard from './components/AdminDashboard';
+import UserManagement from './components/UserManagement';
 import PatternMaster from './components/PatternMaster';
 import PlanningMaster from './components/PlanningMaster';
 import LabMaster from './components/LabMaster';
 import Melting from './components/Melting';
+import ReportBuilder from './components/ReportBuilder';
+import ReportScheduler from './components/ReportScheduler';
 import Layout from './components/Layout/Layout';
 import './App.css';
 
@@ -61,7 +63,7 @@ const App = () => {
 
           {/* Protected Routes Wrapped in Layout */}
           <Route path="/" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="dashboard">
               <Layout user={user} onLogout={handleLogout}>
                 <div className="card">
                   <h1>Welcome, {user?.username}!</h1>
@@ -72,7 +74,7 @@ const App = () => {
           } />
 
           <Route path="/pattern-master" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="pattern-master">
               <Layout user={user} onLogout={handleLogout}>
                 <PatternMaster />
               </Layout>
@@ -80,7 +82,7 @@ const App = () => {
           } />
 
           <Route path="/planning-master" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="planning-master">
               <Layout user={user} onLogout={handleLogout}>
                 <PlanningMaster />
               </Layout>
@@ -88,7 +90,7 @@ const App = () => {
           } />
 
           <Route path="/lab-master" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="lab-master">
               <Layout user={user} onLogout={handleLogout}>
                 <LabMaster />
               </Layout>
@@ -96,7 +98,7 @@ const App = () => {
           } />
 
           <Route path="/melting" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="melting">
               <Layout user={user} onLogout={handleLogout}>
                 <Melting />
               </Layout>
@@ -104,7 +106,7 @@ const App = () => {
           } />
 
           <Route path="/database-explorer" element={
-            <PrivateRoute user={user}>
+            <PrivateRoute user={user} requiredPage="database-explorer">
               <Layout user={user} onLogout={handleLogout}>
                 <DatabaseExplorer />
               </Layout>
@@ -114,7 +116,23 @@ const App = () => {
           <Route path="/admin" element={
             <PrivateRoute user={user} requiredRole="admin">
               <Layout user={user} onLogout={handleLogout}>
-                <AdminDashboard />
+                <UserManagement />
+              </Layout>
+            </PrivateRoute>
+          } />
+
+          <Route path="/report-builder" element={
+            <PrivateRoute user={user} requiredRole="admin">
+              <Layout user={user} onLogout={handleLogout}>
+                <ReportBuilder />
+              </Layout>
+            </PrivateRoute>
+          } />
+
+          <Route path="/report-scheduler" element={
+            <PrivateRoute user={user} requiredRole="admin">
+              <Layout user={user} onLogout={handleLogout}>
+                <ReportScheduler />
               </Layout>
             </PrivateRoute>
           } />
