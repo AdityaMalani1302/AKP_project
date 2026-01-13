@@ -293,14 +293,57 @@ pm2-startup install
 
 ---
 
-## 🔐 Account Credentials Required
+## 🏢 Account Ownership & Long-term Recommendations
 
-| Service    | Account Owner | What's Needed          |
-| ---------- | ------------- | ---------------------- |
-| GitHub     | Aditya        | Code repository access |
-| Vercel     | Aditya        | Frontend hosting       |
-| Cloudflare | Aditya        | Tunnel management      |
-| SQL Server | Company IT    | Database credentials   |
+### Current Account Setup
+
+| Service    | Current Owner | Current Account  |
+| ---------- | ------------- | ---------------- |
+| GitHub     | Aditya Malani | Personal account |
+| Vercel     | Aditya Malani | Personal account |
+| Cloudflare | Aditya Malani | Personal account |
+| SQL Server | Company IT    | Company owned    |
+
+### Recommendation for Long-term
+
+For business continuity, the company should create its own accounts:
+
+#### Option 1: Create Company Accounts (Recommended)
+
+1. **Create a shared company email**: `it@akpfoundries.com` or similar
+2. **Create accounts with that email**:
+   - GitHub: Create `github.com/akpfoundries` organization
+   - Vercel: Create team account at `vercel.com`
+   - Cloudflare: Create account at `cloudflare.com`
+3. **Transfer/Invite**:
+   - GitHub: Transfer repository to company organization
+   - Vercel: Invite company email as team owner
+   - Cloudflare: Create new tunnel under company account
+
+#### Option 2: Keep Developer Accounts (Current - Short-term OK)
+
+- ✅ Works fine for testing and initial deployment
+- ⚠️ Risk: If developer leaves, company loses access
+- 💡 Solution: Ensure developer shares all credentials securely
+
+### How to Transfer Later
+
+#### GitHub Repository Transfer:
+
+1. Go to Repository → Settings → Danger Zone
+2. Click "Transfer ownership"
+3. Enter new owner (company organization)
+
+#### Vercel Project Transfer:
+
+1. Go to Project → Settings → General
+2. Click "Transfer project"
+3. Enter new team/account
+
+#### Cloudflare Tunnel Transfer:
+
+- Easier to create new tunnel under company account
+- Update Vercel `VITE_API_URL` with new tunnel URL
 
 ---
 
