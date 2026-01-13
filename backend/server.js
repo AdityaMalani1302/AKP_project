@@ -117,6 +117,11 @@ connectSQL();
 
 // Middleware to Attach Database Pool to Request
 app.use((req, res, next) => {
+    // Skip DB attachment for health check (it handles its own DB check)
+    if (req.path === '/api/health') {
+        return next();
+    }
+    
     const { getPool } = require('./config/db');
     // Default to 'IcSoftVer3' (ERP) unless specified otherwise
     // We could make this dynamic based on route/headers if needed
