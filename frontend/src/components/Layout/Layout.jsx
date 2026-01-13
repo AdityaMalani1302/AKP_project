@@ -4,20 +4,39 @@ import Header from './Header';
 
 import Breadcrumbs from '../common/Breadcrumbs';
 
-const Layout = ({ children, user, onLogout }) => {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+const SIDEBAR_STATE_KEY = 'smart-erp-sidebar-open';
 
-    // Auto-close sidebar on mobile, auto-open on desktop
+const Layout = ({ children, user, onLogout }) => {
+    // Initialize sidebar state from localStorage (default to true for desktop)
+    const [sidebarOpen, setSidebarOpen] = useState(() => {
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            const saved = localStorage.getItem(SIDEBAR_STATE_KEY);
+            return saved !== null ? saved === 'true' : true;
+        }
+        return false; // Mobile starts closed
+    });
+
+    // Save to localStorage when sidebar state changes (desktop only)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            localStorage.setItem(SIDEBAR_STATE_KEY, String(sidebarOpen));
+        }
+    }, [sidebarOpen]);
+
+    // Auto-close sidebar on mobile, respect localStorage on desktop
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
                 setSidebarOpen(false);
             } else {
-                setSidebarOpen(true);
+                // On desktop, restore from localStorage
+                const saved = localStorage.getItem(SIDEBAR_STATE_KEY);
+                setSidebarOpen(saved !== null ? saved === 'true' : true);
             }
         };
 
-        handleResize(); // Initial check
+        // Only run on mount for initial responsive check
+        // Don't override user preference on every resize
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -44,7 +63,7 @@ const Layout = ({ children, user, onLogout }) => {
                 marginLeft: mainMargin,
                 display: 'flex',
                 flexDirection: 'column',
-                transition: 'margin-left 0.3s ease-in-out',
+                transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 width: '100%',
                 minWidth: 0
             }}>

@@ -10,6 +10,8 @@ const fs = require('fs');
 const { getPool } = require('../config/db');
 const { generatePDF, getGeneratedReports, deleteReport, REPORTS_DIR } = require('../services/pdfService');
 const { requireRole } = require('../middleware/authMiddleware');
+const { cacheMiddleware } = require('../utils/cache');
+const { validateBody, reportSchema } = require('../utils/validators');
 
 // All routes require admin role
 router.use(requireRole('admin'));
@@ -20,9 +22,9 @@ router.use(requireRole('admin'));
 
 /**
  * GET /api/reports
- * Get all report templates
+ * Get all report templates - cached 60 seconds
  */
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware('reports-list', 60), async (req, res) => {
     try {
         const pool = getPool('IcSoftVer3');
         const result = await pool.request().query(`
@@ -62,9 +64,9 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/reports
- * Create new report template
+ * Create new report template - with validation
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody(reportSchema), async (req, res) => {
     try {
         const { ReportName, Description, SqlQuery, DatabaseName } = req.body;
         
@@ -293,7 +295,8 @@ router.get('/files/list', async (req, res) => {
  */
 router.get('/download/:fileName', (req, res) => {
     try {
-        const fileName = req.params.fileName;
+        // Sanitize filename to prevent path traversal
+        const fileName = path.basename(req.params.fileName);
         const filePath = path.join(REPORTS_DIR, fileName);
         
         if (!fs.existsSync(filePath)) {
@@ -313,7 +316,8 @@ router.get('/download/:fileName', (req, res) => {
  */
 router.delete('/files/:fileName', (req, res) => {
     try {
-        const deleted = deleteReport(req.params.fileName);
+        // Sanitize filename to prevent path traversal
+        const deleted = deleteReport(path.basename(req.params.fileName));
         if (deleted) {
             res.json({ success: true, message: 'File deleted' });
         } else {

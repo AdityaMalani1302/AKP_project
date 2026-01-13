@@ -1,13 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { sql } = require('../config/db');
+const { sql, getPool } = require('../config/db');
+const { cacheMiddleware } = require('../utils/cache');
 
 // --- Helper Routes (Dropdowns & Tables) ---
 
-// 4. Get All Tables
+// 4. Get All Tables (with optional database selection)
 router.get('/tables', async (req, res) => {
     try {
-        const result = await req.db.request().query`
+        const database = req.query.database || 'IcSoftVer3';
+        const pool = getPool(database);
+        
+        if (!pool) {
+            return res.status(400).json({ error: `Database '${database}' is not available` });
+        }
+
+        const result = await pool.request().query`
             SELECT name AS TABLE_NAME 
             FROM sys.tables 
             WHERE name != 'sysdiagrams'
@@ -20,24 +28,31 @@ router.get('/tables', async (req, res) => {
     }
 });
 
-// 5. Get Table Data (Paginated)
+// 5. Get Table Data (Paginated, with optional database selection)
 router.get('/tables/:tableName', async (req, res) => {
     const { tableName } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
+    const database = req.query.database || 'IcSoftVer3';
 
     try {
         if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
             return res.status(400).json({ error: 'Invalid table name' });
         }
 
+        const pool = getPool(database);
+        
+        if (!pool) {
+            return res.status(400).json({ error: `Database '${database}' is not available` });
+        }
+
         // Get total count
-        const countResult = await req.db.request().query(`SELECT COUNT(*) as total FROM [${tableName}]`);
+        const countResult = await pool.request().query(`SELECT COUNT(*) as total FROM [${tableName}]`);
         const total = countResult.recordset[0].total;
 
         // Get paginated data
-        const result = await req.db.request().query(`
+        const result = await pool.request().query(`
             SELECT * FROM (
                 SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
                 FROM [${tableName}]
@@ -62,8 +77,8 @@ router.get('/tables/:tableName', async (req, res) => {
     }
 });
 
-// 6. Get Customers for dropdown (with search)
-router.get('/customers', async (req, res) => {
+// 6. Get Customers for dropdown (with search) - cached for 5 minutes
+router.get('/customers', cacheMiddleware('customers', 300), async (req, res) => {
     try {
         const { search } = req.query;
         let query = 'SELECT CustId, CustName FROM Customer';
@@ -77,6 +92,12 @@ router.get('/customers', async (req, res) => {
         query += ' ORDER BY CustName';
 
         const result = await request.query(query);
+        
+        // Cache for 5 minutes for dropdown data (static-ish)
+        if (!search) {
+            res.set('Cache-Control', 'public, max-age=300');
+        }
+        
         res.json(result.recordset);
     } catch (err) {
         console.error('Error fetching customers:', err);
@@ -84,8 +105,8 @@ router.get('/customers', async (req, res) => {
     }
 });
 
-// 7. Get Products for dropdown (with search)
-router.get('/products', async (req, res) => {
+// 7. Get Products for dropdown (with search) - cached for 5 minutes
+router.get('/products', cacheMiddleware('products', 300), async (req, res) => {
     try {
         const { search } = req.query;
         let query = `
@@ -122,8 +143,8 @@ router.get('/products', async (req, res) => {
     }
 });
 
-// 8. Get Suppliers (Pattern Makers)
-router.get('/suppliers', async (req, res) => {
+// 8. Get Suppliers (Pattern Makers) - cached for 5 minutes
+router.get('/suppliers', cacheMiddleware('suppliers', 300), async (req, res) => {
     try {
         const { search } = req.query;
         let query = 'SELECT SupId, SupName FROM Invent_Supplier';
@@ -144,8 +165,8 @@ router.get('/suppliers', async (req, res) => {
     }
 });
 
-// Get Sleeves
-router.get('/sleeves', async (req, res) => {
+// Get Sleeves (cached for 10 minutes - static data)
+router.get('/sleeves', cacheMiddleware('sleeves', 600), async (req, res) => {
     try {
         const result = await req.db.request().query`
             SELECT RawMatID, RawMatName 
@@ -160,14 +181,16 @@ router.get('/sleeves', async (req, res) => {
     }
 });
 
-// Get Grades
-router.get('/grades', async (req, res) => {
+// Get Grades (cached for 10 minutes - rarely changes)
+router.get('/grades', cacheMiddleware('grades', 600), async (req, res) => {
     try {
         const result = await req.db.request().query`
             SELECT GradeId, GradeName 
             FROM Grade 
             ORDER BY GradeName
         `;
+        // Cache grades for 10 minutes - rarely changes
+        res.set('Cache-Control', 'public, max-age=600');
         res.json(result.recordset);
     } catch (err) {
         console.error('Error fetching grades:', err);

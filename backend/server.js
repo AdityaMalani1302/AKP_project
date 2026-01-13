@@ -6,15 +6,40 @@ const compression = require('compression');
 const path = require('path');
 require('dotenv').config();
 
+// Fail-fast validation for critical environment variables
+const requiredEnvVars = ['JWT_SECRET', 'SQL_USER', 'SQL_PASSWORD', 'SQL_SERVER'];
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+    console.error(`FATAL: Missing required environment variables: ${missingVars.join(', ')}`);
+    console.error('Please check your .env file configuration.');
+    process.exit(1);
+}
+
 const { connectSQL, sql } = require('./config/db');
-const { verifyToken } = require('./middleware/authMiddleware');
+const { verifyToken, requirePage } = require('./middleware/authMiddleware');
+const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security & Optimization Middleware
 app.use(helmet({
-    contentSecurityPolicy: false, // Disabled for dev/simplicity, enable in strict prod
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // React needs these
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: null, // Explicitly disable HTTPS upgrade
+        },
+    },
+    hsts: false, // Disable HSTS since we are running on HTTP
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
 }));
 app.use(compression());
 
@@ -22,7 +47,8 @@ app.use(compression());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
-    process.env.CORS_ORIGIN // e.g., http://192.168.1.10:5173
+    process.env.CORS_ORIGIN,      // e.g., http://192.168.1.10:5173
+    process.env.FRONTEND_URL       // Vercel/Netlify URL for cloud deployment
 ].filter(Boolean);
 
 app.use(cors({
@@ -37,6 +63,16 @@ app.use(cors({
         // Allow local network IPs (IPv4)
         // Regex matches http://192.168.x.x(:port)
         if (/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)) {
+            return callback(null, true);
+        }
+
+        // Allow Vercel preview deployments (*.vercel.app)
+        if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
+            return callback(null, true);
+        }
+
+        // Allow Cloudflare tunnel domains (*.trycloudflare.com)
+        if (/^https:\/\/.*\.trycloudflare\.com$/.test(origin)) {
             return callback(null, true);
         }
 
@@ -90,22 +126,38 @@ const masterRoutes = require('./routes/masterRoutes');
 const patternRoutes = require('./routes/patternRoutes');
 const planningRoutes = require('./routes/planningRoutes');
 const labRoutes = require('./routes/labRoutes');
+const qualityLabRoutes = require('./routes/qualityLabRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
+const itManagementRoutes = require('./routes/itManagementRoutes');
+
+
+const salesDashboardRoutes = require('./routes/salesDashboardRoutes');
+const financeDashboardRoutes = require('./routes/financeDashboardRoutes');
+const arDashboardRoutes = require('./routes/arDashboardRoutes');
+const productionDashboardRoutes = require('./routes/productionDashboardRoutes');
+const drawingMasterRoutes = require('./routes/drawingMasterRoutes');
 const { initScheduler } = require('./services/schedulerService');
 
 // Auth Routes (Public: Login, Register if admin)
 // Note: /me is protected inside the router
-app.use('/api/auth', authRoutes);
+// Apply rate limiting to auth routes (especially login)
+app.use('/api/auth', authLimiter, authRoutes);
 
 // Protected Routes
 // We apply verifyToken middleware here to protect entire groups of routes
+// requirePage enforces page-level permissions for employees
 app.use('/api/users', verifyToken, userRoutes);
 app.use('/api/pattern-master', verifyToken, patternRoutes);
 app.use('/api/lab-master', verifyToken, labRoutes);
+app.use('/api/quality-lab', verifyToken, requirePage('quality-lab'), qualityLabRoutes);
 
-// Planning Master - Mount at /api since it has multiple paths inside (/planning-master, /raw-materials)
-app.use('/api', verifyToken, planningRoutes);
+// Sales & Finance Dashboards (Must be before generic /api routes)
+app.use('/api/sales-dashboard', verifyToken, salesDashboardRoutes);
+app.use('/api/finance-dashboard', verifyToken, financeDashboardRoutes);
+app.use('/api/ar-dashboard', verifyToken, arDashboardRoutes);
+app.use('/api/production-dashboard', verifyToken, productionDashboardRoutes);
+app.use('/api/drawing-master', verifyToken, drawingMasterRoutes);
 
 // Master Data Routes (Customers, Products, etc.)
 // These were previously at /api/customers, /api/products directly.
@@ -114,11 +166,24 @@ app.use('/api', verifyToken, planningRoutes);
 // TO MINIMIZE FRONTEND CHANGES: We mount at /api and use the paths defined in router.
 app.use('/api', verifyToken, masterRoutes);
 
+// Planning Master - Mount at /api since it has multiple paths inside (/planning-master, /raw-materials)
+app.use('/api', verifyToken, requirePage('planning-master'), planningRoutes);
+
+
+
 // Report Automation Routes (admin-only enforced in routers)
 app.use('/api/reports', verifyToken, reportRoutes);
 app.use('/api/schedules', verifyToken, scheduleRoutes);
+app.use('/api/it-management', verifyToken, itManagementRoutes);
 
+// Centralized Error Handler (must be after all routes)
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
+// 404 for API routes (only if path starts with /api and no route matched)
+app.use('/api', notFoundHandler);
+
+// Error handler (catches errors from all routes)
+app.use(errorHandler);
 
 // Catch-all handler for SPA (Must be after API routes)
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'deployment') {

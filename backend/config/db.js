@@ -7,6 +7,11 @@ const dbConfig = {
     server: process.env.SQL_SERVER,
     requestTimeout: 60000,  // 60 seconds for query execution
     connectionTimeout: 30000,  // 30 seconds for connection
+    pool: {
+        max: 10,                    // Maximum connections in pool
+        min: 2,                     // Minimum connections to maintain
+        idleTimeoutMillis: 30000    // Close idle connections after 30s
+    },
     options: {
         encrypt: false,
         trustServerCertificate: true

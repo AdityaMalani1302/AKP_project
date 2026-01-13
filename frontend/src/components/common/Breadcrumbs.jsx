@@ -4,13 +4,18 @@ import { Link } from 'react-router-dom';
 
 const routes = [
     { path: '/', breadcrumb: 'Home' },
+    { path: '/sales-dashboard', breadcrumb: 'Sales Dashboard' },
+    { path: '/finance-dashboard', breadcrumb: 'Finance Dashboard' },
     { path: '/pattern-master', breadcrumb: 'Pattern Master' },
-    { path: '/planning-master', breadcrumb: 'Planning Master' },
+    { path: '/planning-master', breadcrumb: 'Planning' },
     { path: '/lab-master', breadcrumb: 'Lab Master' },
     { path: '/melting', breadcrumb: 'Melting' },
+    { path: '/quality-lab', breadcrumb: 'Quality & Lab' },
+    { path: '/it-management', breadcrumb: 'IT Management' },
     { path: '/database-explorer', breadcrumb: 'Database Explorer' },
     { path: '/admin', breadcrumb: 'User Management' },
-    // Add more routes as needed
+    { path: '/report-builder', breadcrumb: 'Report Builder' },
+    { path: '/report-scheduler', breadcrumb: 'Report Scheduler' },
 ];
 
 const Breadcrumbs = () => {

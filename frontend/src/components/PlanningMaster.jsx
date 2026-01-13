@@ -1,15 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
+import { useDebounce } from '../utils/useDebounce';
 import { validatePlanningMaster } from '../utils/validation';
 import '../App.css';
 import AlertDialog from './common/AlertDialog';
-import TableSkeleton from './common/TableSkeleton';
 import TextTooltip from './common/TextTooltip';
+import Combobox from './common/Combobox';
+import DatePicker from './common/DatePicker';
+import AnimatedTabs from './common/AnimatedTabs';
+import NumberInput from './common/NumberInput';
 import PlanningEntry from './PlanningEntry';
+import SleeveRequirement from './SleeveRequirement';
+import SleeveIndent from './SleeveIndent';
 
-const PlanningMaster = () => {
+const PlanningMaster = ({ user }) => {
+    // All available tabs with their permission pageId
+    const allTabs = [
+        { id: 'schedule', label: 'Planning Schedule Qty', pageId: 'planning-schedule' },
+        { id: 'entry', label: 'Planning Entry', pageId: 'planning-entry' },
+        { id: 'sleeve', label: 'Sleeve Requirement', pageId: 'planning-sleeve' },
+        { id: 'sleeveIndent', label: 'Sleeve Indent', pageId: 'planning-sleeve-indent' }
+    ];
+
+    // Filter tabs based on user permissions
+    const getVisibleTabs = () => {
+        if (!user) return allTabs;
+        
+        // Admins see all tabs
+        if (user.role === 'admin') return allTabs;
+        
+        const allowedPages = user.allowedPages || [];
+        
+        // If user has 'all' access, show all tabs
+        if (allowedPages.includes('all')) return allTabs;
+        
+        // If no specific sub-tabs are assigned, show all tabs (backward compatibility)
+        const hasAnySubTab = allTabs.some(tab => allowedPages.includes(tab.pageId));
+        if (!hasAnySubTab) return allTabs;
+        
+        // Filter to only allowed tabs
+        return allTabs.filter(tab => allowedPages.includes(tab.pageId));
+    };
+
+    const visibleTabs = getVisibleTabs();
+
     const [formData, setFormData] = useState({
         ItemCode: '',
         CustomerName: '',
@@ -19,26 +56,32 @@ const PlanningMaster = () => {
 
     const [selectedId, setSelectedId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const [isEditing, setIsEditing] = useState(false);
     const [errors, setErrors] = useState({});
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' or 'entry'
+    
+    // Tab state with URL persistence
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    // Read tab from URL, default to first visible tab
+    const urlTab = searchParams.get('tab');
+    const activeTab = (urlTab && visibleTabs.some(t => t.id === urlTab)) ? urlTab : (visibleTabs[0]?.id || 'schedule');
+    
+    // Handler to change tab and update URL
+    const setActiveTab = useCallback((tab) => {
+        setSearchParams(prev => {
+            prev.set('tab', tab);
+            return prev;
+        }, { replace: true });
+    }, [setSearchParams]);
 
     // Frozen date - using ref for immediate access (persists until page refresh)
     const frozenDateRef = useRef(null);
 
     // Dropdown data
     const [customers, setCustomers] = useState([]);
-    const [filteredCustomers, setFilteredCustomers] = useState([]);
-    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-
     const [rawMaterials, setRawMaterials] = useState([]);
-    const [filteredRawMaterials, setFilteredRawMaterials] = useState([]);
-    const [showItemDropdown, setShowItemDropdown] = useState(false);
-
-    const itemDropdownRef = useRef(null);
-    const customerDropdownRef = useRef(null);
 
     const formatDate = (dateString) => {
         if (!dateString) return '';
@@ -55,7 +98,6 @@ const PlanningMaster = () => {
         try {
             const response = await api.get('/customers');
             setCustomers(response.data);
-            setFilteredCustomers(response.data);
         } catch (err) {
             console.error('Error fetching customers:', err);
         }
@@ -65,7 +107,6 @@ const PlanningMaster = () => {
         try {
             const response = await api.get('/raw-materials');
             setRawMaterials(response.data);
-            setFilteredRawMaterials(response.data);
         } catch (err) {
             console.error('Error fetching raw materials:', err);
         }
@@ -80,10 +121,9 @@ const PlanningMaster = () => {
     const queryClient = useQueryClient();
 
     const { data: schedules = [], isError: isQueryError, isLoading: isQueryLoading } = useQuery({
-        queryKey: ['planningSchedules', searchQuery],
-        queryFn: () => fetchSchedulesFromApi(searchQuery),
+        queryKey: ['planningSchedules', debouncedSearchTerm],
+        queryFn: () => fetchSchedulesFromApi(debouncedSearchTerm),
         placeholderData: keepPreviousData,
-        staleTime: 5000,
     });
 
     // Mutations
@@ -146,49 +186,6 @@ const PlanningMaster = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-
-        if (name === 'CustomerName') {
-            if (value.trim() === '') {
-                setFilteredCustomers(customers);
-            } else {
-                const filtered = customers.filter(c => c.CustName.toLowerCase().includes(value.toLowerCase()));
-                setFilteredCustomers(filtered);
-            }
-            setShowCustomerDropdown(true);
-        }
-
-        if (name === 'ItemCode') {
-            if (value.trim() === '') {
-                setFilteredRawMaterials(rawMaterials);
-            } else {
-                const filtered = rawMaterials.filter(r =>
-                    (r.RawMatCode && r.RawMatCode.toLowerCase().includes(value.toLowerCase())) ||
-                    (r.RawMatName && r.RawMatName.toLowerCase().includes(value.toLowerCase()))
-                );
-                setFilteredRawMaterials(filtered);
-            }
-            setShowItemDropdown(true);
-        }
-    };
-
-    const handleItemFocus = () => {
-        setFilteredRawMaterials(rawMaterials);
-        setShowItemDropdown(true);
-    };
-
-    const handleCustomerFocus = () => {
-        setFilteredCustomers(customers);
-        setShowCustomerDropdown(true);
-    };
-
-    const handleItemSelect = (item) => {
-        setFormData(prev => ({ ...prev, ItemCode: item.RawMatCode || '' }));
-        setShowItemDropdown(false);
-    };
-
-    const handleCustomerSelect = (customer) => {
-        setFormData(prev => ({ ...prev, CustomerName: customer.CustName }));
-        setShowCustomerDropdown(false);
     };
 
     const formatDateForInput = (dateString) => {
@@ -198,8 +195,25 @@ const PlanningMaster = () => {
     };
 
     const handleAdd = () => {
-        // Validate first
+        // Validate first using standard validation
         const validationErrors = validatePlanningMaster(formData);
+        
+        // Additional validation: Check if ItemCode is from the dropdown
+        if (formData.ItemCode && formData.ItemCode.trim()) {
+            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode);
+            if (!isValidItemCode) {
+                validationErrors.ItemCode = 'Please select a valid Item Code from the dropdown';
+            }
+        }
+        
+        // Additional validation: Check if CustomerName is from the dropdown
+        if (formData.CustomerName && formData.CustomerName.trim()) {
+            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName);
+            if (!isValidCustomer) {
+                validationErrors.CustomerName = 'Please select a valid Customer from the dropdown';
+            }
+        }
+        
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
             return;
@@ -214,8 +228,25 @@ const PlanningMaster = () => {
             toast.error('Please select a row from the table to edit');
             return;
         }
-        // Validate
+        // Validate using standard validation
         const validationErrors = validatePlanningMaster(formData);
+        
+        // Additional validation: Check if ItemCode is from the dropdown
+        if (formData.ItemCode && formData.ItemCode.trim()) {
+            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode);
+            if (!isValidItemCode) {
+                validationErrors.ItemCode = 'Please select a valid Item Code from the dropdown';
+            }
+        }
+        
+        // Additional validation: Check if CustomerName is from the dropdown
+        if (formData.CustomerName && formData.CustomerName.trim()) {
+            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName);
+            if (!isValidCustomer) {
+                validationErrors.CustomerName = 'Please select a valid Customer from the dropdown';
+            }
+        }
+        
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
             return;
@@ -264,78 +295,38 @@ const PlanningMaster = () => {
         setErrors({});
     };
 
-    const handleSearch = () => setSearchQuery(searchTerm);
+    // Search is now auto-triggered by debounce
+    const handleSearchChange = (e) => setSearchTerm(e.target.value);
 
-    const handleSearchChange = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        if (value === '') setSearchQuery('');
-    };
+    // Prepare options for Combobox
+    const rawMaterialOptions = rawMaterials.map(item => ({
+        value: item.RawMatCode,
+        label: `${item.RawMatCode} - ${item.RawMatName || ''}`
+    }));
 
-    const handleSearchKeyPress = (e) => {
-        if (e.key === 'Enter') handleSearch();
-    };
-
-    const dropdownContainerStyle = {
-        position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '300px',
-        overflowY: 'auto', backgroundColor: 'white', border: '1px solid #3B82F6',
-        borderRadius: '0.5rem', zIndex: 1000, marginTop: '4px',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-    };
-
-    const dropdownItemStyle = {
-        padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #E5E7EB', fontSize: '0.875rem'
-    };
-
-    const dropdownHeaderStyle = {
-        padding: '8px 14px', backgroundColor: '#F3F4F6', fontWeight: '600',
-        fontSize: '0.75rem', color: '#6B7280', textTransform: 'uppercase',
-        borderBottom: '1px solid #E5E7EB', position: 'sticky', top: 0
-    };
+    const customerOptions = customers.map(c => ({
+        value: c.CustName,
+        label: c.CustName
+    }));
 
     return (
         <div className="card">
             <h2 style={{ marginBottom: '1.5rem' }}>Planning</h2>
 
             {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: '0', marginBottom: '1.5rem', borderBottom: '2px solid #E5E7EB' }}>
-                <button
-                    onClick={() => setActiveTab('schedule')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        border: 'none',
-                        backgroundColor: activeTab === 'schedule' ? '#3B82F6' : 'transparent',
-                        color: activeTab === 'schedule' ? 'white' : '#6B7280',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        borderRadius: '0.5rem 0.5rem 0 0',
-                        transition: 'all 0.2s',
-                        fontSize: '0.875rem'
-                    }}
-                >
-                    Planning Schedule Qty
-                </button>
-                <button
-                    onClick={() => setActiveTab('entry')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        border: 'none',
-                        backgroundColor: activeTab === 'entry' ? '#3B82F6' : 'transparent',
-                        color: activeTab === 'entry' ? 'white' : '#6B7280',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        borderRadius: '0.5rem 0.5rem 0 0',
-                        transition: 'all 0.2s',
-                        fontSize: '0.875rem'
-                    }}
-                >
-                    Planning Entry
-                </button>
-            </div>
+            <AnimatedTabs
+                tabs={visibleTabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
 
             {/* Tab Content */}
             {activeTab === 'entry' ? (
                 <PlanningEntry />
+            ) : activeTab === 'sleeve' ? (
+                <SleeveRequirement />
+            ) : activeTab === 'sleeveIndent' ? (
+                <SleeveIndent />
             ) : (
                 <>
             <div className="section-container section-blue" style={{ marginBottom: '1.5rem' }}>
@@ -346,68 +337,27 @@ const PlanningMaster = () => {
 
                 <div className="form-grid">
                     {/* Item Code */}
-                    <div className="form-group" style={{ position: 'relative' }} ref={itemDropdownRef}>
-                        <label htmlFor="ItemCode" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                            Item Code <span style={{ color: '#EF4444' }}>*</span>
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <input type="text" id="ItemCode" name="ItemCode" value={formData.ItemCode}
-                                onChange={handleChange} onFocus={handleItemFocus}
-                                onBlur={() => setTimeout(() => setShowItemDropdown(false), 200)}
-                                className="input-field" placeholder="Select or type Item Code..." autoComplete="off"
-                                style={{ borderColor: errors.ItemCode ? '#EF4444' : undefined }} />
-                            <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', pointerEvents: 'none' }}>▼</span>
-                        </div>
+                    <div className="form-group">
+                        <Combobox
+                            label="Item Code"
+                            options={rawMaterialOptions}
+                            value={formData.ItemCode}
+                            onChange={(val) => setFormData(prev => ({ ...prev, ItemCode: val }))}
+                            placeholder="Select or type Item Code..."
+                        />
                         {errors.ItemCode && <span style={{ color: '#EF4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>{errors.ItemCode}</span>}
-                        {showItemDropdown && (
-                            <div style={dropdownContainerStyle}>
-                                <div style={dropdownHeaderStyle}>Raw Materials ({filteredRawMaterials.length} items)</div>
-                                {filteredRawMaterials.length === 0 ? (
-                                    <div style={{ padding: '12px 14px', color: '#9CA3AF', textAlign: 'center' }}>No items found</div>
-                                ) : (
-                                    filteredRawMaterials.map((item, index) => (
-                                        <div key={item.RawMatCode || index} onClick={() => handleItemSelect(item)} style={dropdownItemStyle}
-                                            onMouseEnter={(e) => { e.target.style.backgroundColor = '#EFF6FF'; }}
-                                            onMouseLeave={(e) => { e.target.style.backgroundColor = 'white'; }}>
-                                            <span style={{ fontWeight: '600', color: '#2563EB' }}>{item.RawMatCode}</span>
-                                            <span style={{ marginLeft: '8px', color: '#6B7280' }}>{item.RawMatName || ''}</span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Customer Name */}
-                    <div className="form-group" style={{ position: 'relative' }} ref={customerDropdownRef}>
-                        <label htmlFor="CustomerName" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                            Customer Name <span style={{ color: '#EF4444' }}>*</span>
-                        </label>
-                        <div style={{ position: 'relative' }}>
-                            <input type="text" id="CustomerName" name="CustomerName" value={formData.CustomerName}
-                                onChange={handleChange} onFocus={handleCustomerFocus}
-                                onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                                className="input-field" placeholder="Select or type Customer Name..." autoComplete="off"
-                                style={{ borderColor: errors.CustomerName ? '#EF4444' : undefined }} />
-                            <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', pointerEvents: 'none' }}>▼</span>
-                        </div>
+                    <div className="form-group">
+                        <Combobox
+                            label="Customer Name"
+                            options={customerOptions}
+                            value={formData.CustomerName}
+                            onChange={(val) => setFormData(prev => ({ ...prev, CustomerName: val }))}
+                            placeholder="Select or type Customer Name..."
+                        />
                         {errors.CustomerName && <span style={{ color: '#EF4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>{errors.CustomerName}</span>}
-                        {showCustomerDropdown && (
-                            <div style={dropdownContainerStyle}>
-                                <div style={dropdownHeaderStyle}>Customers ({filteredCustomers.length} items)</div>
-                                {filteredCustomers.length === 0 ? (
-                                    <div style={{ padding: '12px 14px', color: '#9CA3AF', textAlign: 'center' }}>No customers found</div>
-                                ) : (
-                                    filteredCustomers.map((customer) => (
-                                        <div key={customer.CustId} onClick={() => handleCustomerSelect(customer)} style={dropdownItemStyle}
-                                            onMouseEnter={(e) => { e.target.style.backgroundColor = '#EFF6FF'; }}
-                                            onMouseLeave={(e) => { e.target.style.backgroundColor = 'white'; }}>
-                                            {customer.CustName}
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Schedule Qty */}
@@ -415,9 +365,15 @@ const PlanningMaster = () => {
                         <label htmlFor="ScheduleQty" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                             Schedule Qty <span style={{ color: '#EF4444' }}>*</span>
                         </label>
-                        <input type="number" id="ScheduleQty" name="ScheduleQty" value={formData.ScheduleQty}
-                            onChange={handleChange} className="input-field" placeholder="Enter Quantity" min="1"
-                            style={{ borderColor: errors.ScheduleQty ? '#EF4444' : undefined }} />
+                        <NumberInput
+                            id="ScheduleQty"
+                            name="ScheduleQty"
+                            value={formData.ScheduleQty}
+                            onChange={handleChange}
+                            min={1}
+                            placeholder="Enter Quantity"
+                            style={{ borderColor: errors.ScheduleQty ? '#EF4444' : undefined }}
+                        />
                         {errors.ScheduleQty && <span style={{ color: '#EF4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>{errors.ScheduleQty}</span>}
                     </div>
 
@@ -427,9 +383,13 @@ const PlanningMaster = () => {
                             Date <span style={{ color: '#EF4444' }}>*</span>
                             {frozenDateRef.current && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#059669' }}>🔒</span>}
                         </label>
-                        <input type="date" id="PlanDate" name="PlanDate" value={formData.PlanDate}
-                            onChange={handleChange} className="input-field"
-                            style={{ borderColor: errors.PlanDate ? '#EF4444' : undefined }} />
+                        <DatePicker
+                            id="PlanDate"
+                            name="PlanDate"
+                            value={formData.PlanDate}
+                            onChange={handleChange}
+                            placeholder="Select date..."
+                        />
                         {errors.PlanDate && <span style={{ color: '#EF4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>{errors.PlanDate}</span>}
                     </div>
                 </div>
@@ -443,9 +403,9 @@ const PlanningMaster = () => {
 
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <label style={{ fontWeight: '500', whiteSpace: 'nowrap', color: '#374151' }}>Search:</label>
-                        <input type="text" value={searchTerm} onChange={handleSearchChange} onKeyPress={handleSearchKeyPress}
-                            placeholder="Search by Item Code or Customer..." className="input-field" style={{ minWidth: '250px' }} />
-                        <button onClick={handleSearch} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>🔍</button>
+                        <input type="text" value={searchTerm} onChange={handleSearchChange}
+                            placeholder="Type to search..." className="input-field" style={{ minWidth: '250px' }} />
+                        {searchTerm && <button onClick={() => setSearchTerm('')} className="btn btn-secondary" style={{ padding: '0.5rem 0.75rem' }}>✕</button>}
                     </div>
                 </div>
             </div>
@@ -454,56 +414,76 @@ const PlanningMaster = () => {
             <div className="section-container section-gray">
                 <h3 className="section-title gray">Planning Schedules ({schedules.length} records)</h3>
 
-                {isQueryLoading ? (
-                    <TableSkeleton rows={10} columns={5} />
-                ) : (
-                    <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
+                {/* Standard HTML Table with scroll */}
+                <div style={{ 
+                    border: '1px solid #E5E7EB', 
+                    borderRadius: '6px', 
+                    overflow: 'auto',
+                    maxHeight: '500px'
+                }}>
+                    {isQueryLoading ? (
+                        <div style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                            Loading schedules...
+                        </div>
+                    ) : schedules && schedules.length > 0 ? (
+                        <table style={{ 
+                            width: '100%', 
+                            borderCollapse: 'collapse',
+                            minWidth: 'max-content'
+                        }}>
+                            <thead style={{ 
+                                position: 'sticky', 
+                                top: 0, 
+                                backgroundColor: '#F9FAFB',
+                                zIndex: 10
+                            }}>
                                 <tr>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>ID</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>Item Code</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>Customer Name</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap' }}>Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap' }}>Plan Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Item Code</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Customer Name</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Qty</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Plan Date</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {schedules.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
-                                            No records found
-                                        </td>
+                                {schedules.map((schedule) => (
+                                    <tr 
+                                        key={schedule.ID} 
+                                        onClick={() => handleRowClick(schedule)}
+                                        style={{
+                                            borderBottom: '1px solid #E5E7EB',
+                                            backgroundColor: selectedId === schedule.ID ? '#DBEAFE' : 'white',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{schedule.ID}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.ItemCode} maxLength={20} /></td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.CustomerName} maxLength={25} /></td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'right' }}>{schedule.ScheduleQty}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{formatDate(schedule.PlanDate)}</td>
                                     </tr>
-                                ) : (
-                                    schedules.map((schedule) => (
-                                        <tr
-                                            key={schedule.ID}
-                                            onClick={() => handleRowClick(schedule)}
-                                            style={{
-                                                cursor: 'pointer',
-                                                backgroundColor: selectedId === schedule.ID ? '#DBEAFE' : 'white',
-                                                transition: 'background-color 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => { if (selectedId !== schedule.ID) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
-                                            onMouseLeave={(e) => { if (selectedId !== schedule.ID) e.currentTarget.style.backgroundColor = 'white'; }}
-                                        >
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{schedule.ID}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={schedule.ItemCode} maxLength={20} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={schedule.CustomerName} maxLength={25} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', textAlign: 'right', whiteSpace: 'nowrap' }}>{schedule.ScheduleQty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDate(schedule.PlanDate)}</td>
-                                        </tr>
-                                    ))
-                                )}
+                                ))}
                             </tbody>
                         </table>
-                    </div>
-                )}
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                            No records found
+                        </div>
+                    )}
+                </div>
+                
+                {/* Row count footer */}
+                <div style={{
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.75rem',
+                    color: '#6B7280',
+                    backgroundColor: '#F9FAFB',
+                    borderRadius: '0 0 6px 6px',
+                    border: '1px solid #E5E7EB',
+                    borderTop: 'none'
+                }}>
+                    Showing {schedules?.length || 0} rows
+                </div>
 
                 {selectedId && (
                     <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#DBEAFE', borderRadius: '0.375rem', fontSize: '0.875rem', color: '#1E40AF' }}>

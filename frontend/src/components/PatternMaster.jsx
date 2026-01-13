@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useDebounce } from '../utils/useDebounce';
+import { useFormShortcuts } from '../utils/useKeyboardShortcuts';
+import useAutoSave, { DraftRecoveryBanner, AutoSaveIndicator } from '../utils/useAutoSave';
 import { validatePatternMaster } from '../utils/validation';
 import MainDetails from './pattern-master/MainDetails';
 import PatternSection from './pattern-master/PatternSection';
@@ -11,16 +15,43 @@ import ChapletsChillsSection from './pattern-master/ChapletsChillsSection';
 import MouldingSection from './pattern-master/MouldingSection';
 import CastingSection from './pattern-master/CastingSection';
 import SleevesSection from './pattern-master/SleevesSection';
-import PartsTable from './pattern-master/PartsTable';
-import SleevesTable from './pattern-master/SleevesTable';
+import UnifiedRecordsTable from './pattern-master/UnifiedRecordsTable';
 import PatternReturnSection from './pattern-master/PatternReturnSection';
+import PatternHistoryTab from './pattern-master/PatternHistoryTab';
 
 import AdditionalSection from './pattern-master/AdditionalSection';
 import AlertDialog from './common/AlertDialog';
 import TableSkeleton from './common/TableSkeleton';
 import TextTooltip from './common/TextTooltip';
+import Combobox from './common/Combobox';
+import AnimatedTabs from './common/AnimatedTabs';
 
 const PatternMaster = () => {
+    // Tab state with URL persistence
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    // Read tab from URL, default to 'master'
+    const activeTab = searchParams.get('tab') || 'master';
+    
+    // Handler to change tab and update URL
+    const setActiveTab = useCallback((tab) => {
+        setSearchParams(prev => {
+            prev.set('tab', tab);
+            return prev;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // Fetch pattern stats for header card
+    const { data: patternStats, isLoading: statsLoading } = useQuery({
+        queryKey: ['pattern-master', 'stats'],
+        queryFn: async () => {
+            const res = await api.get('/pattern-master/stats');
+            return res.data;
+        },
+        staleTime: 60000, // 1 minute
+        refetchInterval: 60000 // Auto-refresh every 1 minute
+    });
+
     // Split State for Performance
     const [mainData, setMainData] = useState({
         PatternNo: '',
@@ -32,7 +63,8 @@ const PatternMaster = () => {
         Customer_Po_No: '',
         Tooling_PO_Date: '',
         Purchase_No: '',
-        Purchase_Date: ''
+        Purchase_Date: '',
+        Pattern_Received_Date: ''
     });
 
     const [patternData, setPatternData] = useState({
@@ -129,7 +161,8 @@ const PatternMaster = () => {
     const [selectedId, setSelectedId] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchQuery, setSearchQuery] = useState(''); // The active query for the API
+    // Debounced search - auto-search 300ms after typing stops
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger for sub-tables refresh
 
     // Dynamic parts rows state
@@ -139,6 +172,55 @@ const PatternMaster = () => {
 
     // Sleeve options state
     const [sleeveOptions, setSleeveOptions] = useState([]);
+
+    // Pattern numbers for Edit dropdown
+    const [patternNumbers, setPatternNumbers] = useState([]);
+
+    // Combine form data for auto-save
+    const formDataForAutoSave = useMemo(() => ({
+        mainData, patternData, coreBoxData, castingData, coreDetailsData,
+        chapletsChillsData, mouldingData, sleeveRows, additionalData, partRows
+    }), [mainData, patternData, coreBoxData, castingData, coreDetailsData,
+         chapletsChillsData, mouldingData, sleeveRows, additionalData, partRows]);
+
+    // Auto-save hook - saves draft every 3 seconds when form changes
+    const { hasDraft, loadDraft, clearDraft, getLastSavedText } = useAutoSave(
+        'pattern-master-draft',
+        formDataForAutoSave,
+        3000,
+        !isEditing // Only auto-save when creating new, not editing
+    );
+
+    // Handle draft recovery
+    const handleRecoverDraft = useCallback(() => {
+        const draft = loadDraft();
+        if (draft) {
+            if (draft.mainData) setMainData(draft.mainData);
+            if (draft.patternData) setPatternData(draft.patternData);
+            if (draft.coreBoxData) setCoreBoxData(draft.coreBoxData);
+            if (draft.castingData) setCastingData(draft.castingData);
+            if (draft.coreDetailsData) setCoreDetailsData(draft.coreDetailsData);
+            if (draft.chapletsChillsData) setChapletsChillsData(draft.chapletsChillsData);
+            if (draft.mouldingData) setMouldingData(draft.mouldingData);
+            if (draft.sleeveRows) setSleeveRows(draft.sleeveRows);
+            if (draft.additionalData) setAdditionalData(draft.additionalData);
+            if (draft.partRows) setPartRows(draft.partRows);
+            toast.success('Draft recovered successfully!');
+            clearDraft();
+        }
+    }, [loadDraft, clearDraft]);
+
+    // Keyboard shortcuts for power users
+    useFormShortcuts({
+        onSave: () => {
+            // Trigger form submit programmatically
+            const form = document.querySelector('form');
+            if (form) form.requestSubmit();
+        },
+        onCancel: () => handleClear(),
+        onNew: () => handleClear(),
+        enabled: true
+    });
 
     // Fetch sleeves on mount
     useEffect(() => {
@@ -158,6 +240,23 @@ const PatternMaster = () => {
         fetchSleeves();
     }, []);
 
+    // Fetch pattern numbers for Edit dropdown
+    useEffect(() => {
+        const fetchPatternNumbers = async () => {
+            try {
+                const response = await api.get('/pattern-master/numbers');
+                const formatted = response.data.map(p => ({
+                    value: p.PatternId,
+                    label: p.PatternNo || `Pattern ${p.PatternId}`
+                }));
+                setPatternNumbers(formatted);
+            } catch (error) {
+                console.error('Error fetching pattern numbers:', error);
+            }
+        };
+        fetchPatternNumbers();
+    }, [refreshTrigger]);
+
     // React Query for fetching patterns
     const fetchPatternsFromApi = async (query) => {
         const url = query
@@ -170,10 +269,9 @@ const PatternMaster = () => {
     const queryClient = useQueryClient();
 
     const { data: patterns = [], isError: isQueryError, isLoading: isQueryLoading } = useQuery({
-        queryKey: ['patterns', searchQuery],
-        queryFn: () => fetchPatternsFromApi(searchQuery),
+        queryKey: ['patterns', debouncedSearchTerm],
+        queryFn: () => fetchPatternsFromApi(debouncedSearchTerm),
         placeholderData: keepPreviousData,
-        staleTime: 5000,
     });
 
     // Mutations
@@ -230,163 +328,163 @@ const PatternMaster = () => {
         }
     }, [isQueryError]);
 
-    // Search handlers
-    const handleSearch = () => setSearchQuery(searchTerm);
-
+    // Search is now auto-triggered by debounce
     const handleSearchChange = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        if (value === '') setSearchQuery('');
+        setSearchTerm(e.target.value);
     };
 
-    const handleSearchKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleSearch();
-        }
-    };
-
-    // Row click handler for editing
-    const handleRowClick = async (pattern) => {
-        setSelectedId(pattern.PatternId);
+    // Row click handler for editing - can accept pattern object or full data
+    const handleRowClick = async (patternOrData) => {
+        const patternId = patternOrData.PatternId;
+        setSelectedId(patternId);
         setIsEditing(true);
-        // Load full pattern details when row is clicked
-        try {
-            const response = await api.get(`/pattern-master/${pattern.PatternId}`);
-            const data = response.data;
-
-            // Populate Main Details
-            setMainData({
-                PatternNo: data.PatternNo || '',
-                Customer: data.Customer ? { value: data.Customer, label: data.CustomerName || data.Customer } : null,
-                Serial_No: data.Serial_No || '',
-                Part_No: data.Part_No || '',
-                Product_Name: data.Product_Name || '',
-                Asset_No: data.Asset_No || '',
-                Customer_Po_No: data.Customer_Po_No || '',
-                Tooling_PO_Date: data.Tooling_PO_Date || '',
-                Purchase_No: data.Purchase_No || '',
-                Purchase_Date: data.Purchase_Date || ''
-            });
-
-            // Populate Pattern Details
-            setPatternData({
-                Quoted_Estimated_Weight: data.Quoted_Estimated_Weight || '',
-                Pattern_Maker: data.Pattern_Maker ? { value: data.Pattern_Maker, label: data.Pattern_Maker_Name || data.Pattern_Maker } : null,
-                Pattern_Material_Details: data.Pattern_Material_Details || '',
-                No_Of_Patterns_Set: data.No_Of_Patterns_Set || '',
-                Pattern_Pieces: data.Pattern_Pieces || '',
-                Rack_Location: data.Rack_Location || '',
-                Box_Per_Heat: data.Box_Per_Heat || ''
-            });
-
-            // Populate Core Box Details
-            setCoreBoxData({
-                Core_Box_Material_Details: data.Core_Box_Material_Details || '',
-                Core_Box_Location: data.Core_Box_Location || '',
-                Core_Box_S7_F4_No: data.Core_Box_S7_F4_No || '',
-                Core_Box_S7_F4_Date: data.Core_Box_S7_F4_Date || '',
-                No_Of_Core_Box_Set: data.No_Of_Core_Box_Set || '',
-                Core_Box_Pieces: data.Core_Box_Pieces || ''
-            });
-
-            // Populate Casting Details
-            setCastingData({
-                Casting_Material_Grade: data.Casting_Material_Grade || '',
-                Moulding_Box_Size: data.Moulding_Box_Size || '',
-                Total_Weight: data.Total_Weight || '',
-                No_Of_Cavities: data.No_Of_Cavities || '',
-                Bunch_Wt: data.Bunch_Wt || '',
-                YieldPercent: data.YieldPercent || ''
-            });
-
-            // Populate Core Details - parse Core_Type string back to checkboxes
-            const coreTypeObj = {
-                shell: data.Core_Type?.includes('Shell') || false,
-                coldBox: data.Core_Type?.includes('Cold Box') || false,
-                noBake: data.Core_Type?.includes('No-Bake') || false
-            };
-
-            setCoreDetailsData({
-                Core_Wt: data.Core_Wt || '',
-                Core_Type: coreTypeObj,
-                shell_qty: data.shell_qty || '',
-                coldBox_qty: data.coldBox_qty || '',
-                noBake_qty: data.noBake_qty || '',
-                Main_Core: data.Main_Core === 'Yes' || data.Main_Core === true,
-                Side_Core: data.Side_Core === 'Yes' || data.Side_Core === true,
-                Loose_Core: data.Loose_Core === 'Yes' || data.Loose_Core === true,
-                mainCore_qty: data.mainCore_qty || '',
-                sideCore_qty: data.sideCore_qty || '',
-                looseCore_qty: data.looseCore_qty || ''
-            });
-
-            // Populate Chaplets & Chills
-            setChapletsChillsData({
-                Chaplets_COPE: data.Chaplets_COPE || '',
-                Chaplets_DRAG: data.Chaplets_DRAG || '',
-                Chills_COPE: data.Chills_COPE || '',
-                Chills_DRAG: data.Chills_DRAG || ''
-            });
-
-            // Populate Moulding Details
-            setMouldingData({
-                Mould_Vents_Size: data.Mould_Vents_Size || '',
-                Mould_Vents_No: data.Mould_Vents_No || '',
-                breaker_core_size: data.breaker_core_size || '',
-                down_sprue_size: data.down_sprue_size || '',
-                foam_filter_size: data.foam_filter_size || '',
-                sand_riser_size: data.sand_riser_size || '',
-                no_of_sand_riser: data.no_of_sand_riser || '',
-                ingate_size: data.ingate_size || '',
-                no_of_ingate: data.no_of_ingate || '',
-                runner_bar_size: data.runner_bar_size || '',
-                runner_bar_no: data.runner_bar_no || ''
-            });
-
-            // Populate Additional Info
-            setAdditionalData({
-                rev_no_status: data.rev_no_status || '',
-                date: data.date || '',
-                comment: data.comment || ''
-            });
-
-            // Populate Part Rows
-            if (data.parts && data.parts.length > 0) {
-                const formattedParts = data.parts.map(part => ({
-                    partNoOption: part.partNo ? {
-                        value: part.partNo,
-                        label: part.partNo,
-                        prodName: part.productName || '',
-                        gradeId: part.materialGradeId,
-                        gradeName: part.materialGradeName || ''
-                    } : null,
-                    productName: part.productName || '',
-                    materialGradeId: part.materialGradeId || null,
-                    materialGradeName: part.materialGradeName || '',
-                    qty: part.qty || '',
-                    weight: part.weight || ''
-                }));
-                setPartRows(formattedParts);
-            } else {
-                setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
+        
+        // Check if we already have full data (has 'parts' property) or need to fetch
+        let data;
+        if (patternOrData.parts !== undefined) {
+            // Full data already provided
+            data = patternOrData;
+        } else {
+            // Fetch full pattern details
+            try {
+                const response = await api.get(`/pattern-master/${patternId}`);
+                data = response.data;
+            } catch (err) {
+                console.error('Error loading pattern details:', err);
+                toast.error('Failed to load pattern details for editing');
+                return;
             }
+        }
 
-            // Populate Sleeve Rows
-            if (data.sleeves && data.sleeves.length > 0) {
-                const formattedSleeves = data.sleeves.map(sleeve => ({
-                    sleeve_name: sleeve.sleeve_name || '',
-                    sleeve_type_size: sleeve.sleeve_type_size || '',
-                    quantity: sleeve.quantity || ''
-                }));
-                setSleeveRows(formattedSleeves);
-            } else {
-                setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
-            }
+        // Populate Main Details
+        setMainData({
+            PatternNo: data.PatternNo || '',
+            Customer: data.Customer ? { value: data.Customer, label: data.CustomerName || data.Customer } : null,
+            Serial_No: data.Serial_No || '',
+            Part_No: data.Part_No || '',
+            Product_Name: data.Product_Name || '',
+            Asset_No: data.Asset_No || '',
+            Customer_Po_No: data.Customer_Po_No || '',
+            Tooling_PO_Date: data.Tooling_PO_Date || '',
+            Purchase_No: data.Purchase_No || '',
+            Purchase_Date: data.Purchase_Date || '',
+            Pattern_Received_Date: data.Pattern_Received_Date || ''
+        });
 
-        } catch (err) {
-            console.error('Error loading pattern details:', err);
-            toast.error('Failed to load pattern details for editing');
+        // Populate Pattern Details
+        setPatternData({
+            Quoted_Estimated_Weight: data.Quoted_Estimated_Weight || '',
+            Pattern_Maker: data.Pattern_Maker ? { value: data.Pattern_Maker, label: data.Pattern_Maker_Name || data.Pattern_Maker } : null,
+            Pattern_Material_Details: data.Pattern_Material_Details || '',
+            No_Of_Patterns_Set: data.No_Of_Patterns_Set || '',
+            Pattern_Pieces: data.Pattern_Pieces || '',
+            Rack_Location: data.Rack_Location || '',
+            Box_Per_Heat: data.Box_Per_Heat || ''
+        });
+
+        // Populate Core Box Details
+        setCoreBoxData({
+            Core_Box_Material_Details: data.Core_Box_Material_Details || '',
+            Core_Box_Location: data.Core_Box_Location || '',
+            Core_Box_S7_F4_No: data.Core_Box_S7_F4_No || '',
+            Core_Box_S7_F4_Date: data.Core_Box_S7_F4_Date || '',
+            No_Of_Core_Box_Set: data.No_Of_Core_Box_Set || '',
+            Core_Box_Pieces: data.Core_Box_Pieces || ''
+        });
+
+        // Populate Casting Details
+        setCastingData({
+            Casting_Material_Grade: data.Casting_Material_Grade || '',
+            Moulding_Box_Size: data.Moulding_Box_Size || '',
+            Total_Weight: data.Total_Weight || '',
+            No_Of_Cavities: data.No_Of_Cavities || '',
+            Bunch_Wt: data.Bunch_Wt || '',
+            YieldPercent: data.YieldPercent || ''
+        });
+
+        // Populate Core Details - parse Core_Type string back to checkboxes
+        const coreTypeObj = {
+            shell: data.Core_Type?.includes('Shell') || false,
+            coldBox: data.Core_Type?.includes('Cold Box') || false,
+            noBake: data.Core_Type?.includes('No-Bake') || false
+        };
+
+        setCoreDetailsData({
+            Core_Wt: data.Core_Wt || '',
+            Core_Type: coreTypeObj,
+            shell_qty: data.shell_qty || '',
+            coldBox_qty: data.coldBox_qty || '',
+            noBake_qty: data.noBake_qty || '',
+            Main_Core: data.Main_Core === 'Yes' || data.Main_Core === true,
+            Side_Core: data.Side_Core === 'Yes' || data.Side_Core === true,
+            Loose_Core: data.Loose_Core === 'Yes' || data.Loose_Core === true,
+            mainCore_qty: data.mainCore_qty || '',
+            sideCore_qty: data.sideCore_qty || '',
+            looseCore_qty: data.looseCore_qty || ''
+        });
+
+        // Populate Chaplets & Chills
+        setChapletsChillsData({
+            Chaplets_COPE: data.Chaplets_COPE || '',
+            Chaplets_DRAG: data.Chaplets_DRAG || '',
+            Chills_COPE: data.Chills_COPE || '',
+            Chills_DRAG: data.Chills_DRAG || ''
+        });
+
+        // Populate Moulding Details
+        setMouldingData({
+            Mould_Vents_Size: data.Mould_Vents_Size || '',
+            Mould_Vents_No: data.Mould_Vents_No || '',
+            breaker_core_size: data.breaker_core_size || '',
+            down_sprue_size: data.down_sprue_size || '',
+            foam_filter_size: data.foam_filter_size || '',
+            sand_riser_size: data.sand_riser_size || '',
+            no_of_sand_riser: data.no_of_sand_riser || '',
+            ingate_size: data.ingate_size || '',
+            no_of_ingate: data.no_of_ingate || '',
+            runner_bar_size: data.runner_bar_size || '',
+            runner_bar_no: data.runner_bar_no || ''
+        });
+
+        // Populate Additional Info
+        setAdditionalData({
+            rev_no_status: data.rev_no_status || '',
+            date: data.date || '',
+            comment: data.comment || ''
+        });
+
+        // Populate Part Rows
+        if (data.parts && data.parts.length > 0) {
+            const formattedParts = data.parts.map(part => ({
+                partNoOption: part.partNo ? {
+                    value: part.partNo,
+                    label: part.internalPartNo || String(part.partNo),
+                    prodName: part.productName || '',
+                    gradeId: part.materialGradeId,
+                    gradeName: part.materialGradeName || ''
+                } : null,
+                productName: part.productName || '',
+                materialGradeId: part.materialGradeId || null,
+                materialGradeName: part.materialGradeName || '',
+                qty: part.qty || '',
+                weight: part.weight || ''
+            }));
+            setPartRows(formattedParts);
+        } else {
+            setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
+        }
+
+        // Populate Sleeve Rows (backend returns sleeveRows)
+        const sleeves = data.sleeveRows || data.sleeves;
+        if (sleeves && sleeves.length > 0) {
+            const formattedSleeves = sleeves.map(sleeve => ({
+                sleeve_name: sleeve.sleeve_name || '',
+                sleeve_type_size: sleeve.sleeve_type_size || '',
+                quantity: sleeve.quantity || ''
+            }));
+            setSleeveRows(formattedSleeves);
+        } else {
+            setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
         }
     };
 
@@ -409,7 +507,7 @@ const PatternMaster = () => {
     const handleClear = () => {
         setMainData({
             PatternNo: '', Customer: null, Serial_No: '', Part_No: '', Product_Name: '',
-            Asset_No: '', Customer_Po_No: '', Tooling_PO_Date: '', Purchase_No: '', Purchase_Date: ''
+            Asset_No: '', Customer_Po_No: '', Tooling_PO_Date: '', Purchase_No: '', Purchase_Date: '', Pattern_Received_Date: ''
         });
         setPatternData({
             Quoted_Estimated_Weight: '', Pattern_Maker: null, Pattern_Material_Details: '',
@@ -593,7 +691,7 @@ const PatternMaster = () => {
             setErrors(validationErrors);
             setLoading(false);
             // Scroll to top or show alert
-            toast.error("Please fix the errors highlighted in red.");
+            toast.error("Please complete all required fields before submitting.");
             return;
         }
 
@@ -608,8 +706,12 @@ const PatternMaster = () => {
             if (hasAnyColdBox) coreTypeStringParts.push('Cold Box=1');
             if (hasAnyNoBake) coreTypeStringParts.push('No-Bake');
 
-            // Calculate Total Weight from all parts
-            const totalWeight = partRows.reduce((sum, row) => sum + (parseFloat(row.weight) || 0), 0).toFixed(2);
+            // Calculate Total Weight from all parts: (Qty × Weight) for each part
+            const totalWeight = partRows.reduce((sum, row) => {
+                const qty = parseFloat(row.qty) || 0;
+                const weight = parseFloat(row.weight) || 0;
+                return sum + (qty * weight);
+            }, 0).toFixed(2);
 
             // Extract IDs from state objects for submission
             const submissionData = {
@@ -654,9 +756,8 @@ const PatternMaster = () => {
                 // Process parts rows to extract IDs
                 parts: partRows.map(row => ({
                     partNo: row.partNoOption ? row.partNoOption.value : '',
-                    productName: row.partNoOption ? row.partNoOption.prodName : '', // Fixed: use prodName from option
+                    productName: row.partNoOption ? row.partNoOption.prodName : '',
                     materialGradeId: row.materialGradeId || null,
-                    materialGradeName: row.materialGradeName || '',
                     qty: row.qty,
                     weight: row.weight
                 })),
@@ -696,9 +797,95 @@ const PatternMaster = () => {
 
     return (
         <div className="card">
-            <h2 style={{ marginBottom: '1.5rem' }}>Pattern Master</h2>
+            {/* Header with Stats and Edit Dropdown */}
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap',
+                gap: '1rem'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0 }}>Pattern Master</h2>
+                    {/* Patterns Count Card */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)',
+                        borderLeft: '4px solid #8B5CF6',
+                        borderRadius: '12px',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
+                    }}>
+                        <span style={{ fontSize: '1.5rem' }}>📋</span>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#6D28D9' }}>
+                                {statsLoading ? '...' : patternStats?.TotalPatterns || 0}
+                            </h3>
+                            <p style={{ margin: 0, color: '#6B7280', fontSize: '0.75rem' }}>Patterns</p>
+                        </div>
+                    </div>
+                </div>
+                {activeTab === 'master' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '280px' }}>
+                    <label style={{ fontWeight: '500', color: '#374151', whiteSpace: 'nowrap' }}>Edit Pattern:</label>
+                    <div style={{ flex: 1 }}>
+                        <Combobox
+                            value={selectedId || ''}
+                            onChange={async (patternId) => {
+                                if (patternId) {
+                                    const pattern = patternNumbers.find(p => p.value === patternId);
+                                    if (pattern) {
+                                        // Load pattern details
+                                        try {
+                                            const response = await api.get(`/pattern-master/${patternId}`);
+                                            handleRowClick(response.data);
+                                        } catch (err) {
+                                            console.error('Error loading pattern:', err);
+                                            toast.error('Failed to load pattern for editing');
+                                        }
+                                    }
+                                }
+                            }}
+                            options={patternNumbers}
+                            placeholder="Select pattern to edit..."
+                        />
+                    </div>
+                </div>
+                )}
+            </div>
 
+            {/* Tab Navigation */}
+            <AnimatedTabs
+                tabs={[
+                    { id: 'master', label: 'Pattern Master' },
+                    { id: 'history', label: 'Pattern History' }
+                ]}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
+
+            {/* Tab Content */}
+            {activeTab === 'master' ? (
+                <>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
+
+                {/* Draft Recovery Banner */}
+                {hasDraft && !isEditing && (
+                    <DraftRecoveryBanner
+                        onRecover={handleRecoverDraft}
+                        onDiscard={clearDraft}
+                        lastSavedText={getLastSavedText()}
+                    />
+                )}
+
+                {/* Auto-save indicator */}
+                {!isEditing && !hasDraft && getLastSavedText() && (
+                    <div style={{ marginBottom: '0.5rem' }}>
+                        <AutoSaveIndicator lastSavedText={getLastSavedText()} />
+                    </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     <MainDetails
@@ -780,12 +967,13 @@ const PatternMaster = () => {
                             type="text"
                             value={searchTerm}
                             onChange={handleSearchChange}
-                            onKeyPress={handleSearchKeyPress}
-                            placeholder="Pattern No, Customer..."
+                            placeholder="Type to search..."
                             className="input-field"
                             style={{ minWidth: '200px' }}
                         />
-                        <button type="button" onClick={handleSearch} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>🔍</button>
+                        {searchTerm && (
+                            <button type="button" onClick={() => setSearchTerm('')} className="btn btn-secondary" style={{ padding: '0.5rem 0.75rem' }}>✕</button>
+                        )}
                     </div>
                 </div>
 
@@ -804,186 +992,20 @@ const PatternMaster = () => {
                 )}
             </form>
 
-            {/* Table Section */}
-            <div className="section-container section-gray">
-                <h3 className="section-title gray">Pattern Records ({patterns.length} patterns)</h3>
-
-                {isQueryLoading ? (
-                    <TableSkeleton rows={10} columns={30} />
-                ) : (
-                    <div style={{ overflowX: 'auto', maxHeight: '500px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
-                        <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
-                                <tr>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>ID</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pattern No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Customer</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Serial No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Part No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Product Name</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Asset No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Customer PO</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>PO Date</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Purchase No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Purchase Date</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pattern Maker</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Material</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Est. Weight</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Set</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Pieces</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Rack Loc</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Box Per Heat</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Mat</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Loc</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>S7/F4 No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>S7/F4 Date</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Sets</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Box Pieces</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Total Wt</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Type</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Main Core</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Side Core</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Loose Core</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chaplets COPE</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chaplets DRAG</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chills COPE</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Chills DRAG</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mould Vents Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Mould Vents No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Shell Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>ColdBox Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>NoBake Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>MainCore Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>SideCore Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>LooseCore Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Breaker Core Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Down Sprue Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Foam Filter Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Sand Riser Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Sand Riser</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Ingate Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>No of Ingate</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Runner Bar Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Runner Bar No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Rev No Status</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Date</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Comment</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Box Size</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Cavities</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Bunch Wt</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Yield %</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap', backgroundColor: '#F9FAFB' }}>Core Wt</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {patterns.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={60} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
-                                            No records found
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    patterns.map((pattern) => (
-                                        <tr
-                                            key={pattern.PatternId}
-                                            onClick={() => handleRowClick(pattern)}
-                                            style={{
-                                                cursor: 'pointer',
-                                                backgroundColor: selectedId === pattern.PatternId ? '#DBEAFE' : 'white',
-                                                transition: 'background-color 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => { if (selectedId !== pattern.PatternId) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
-                                            onMouseLeave={(e) => { if (selectedId !== pattern.PatternId) e.currentTarget.style.backgroundColor = 'white'; }}
-                                        >
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.PatternId}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.PatternNo}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={pattern.CustomerName} maxLength={20} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Serial_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Part_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={pattern.Product_Name} maxLength={20} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Asset_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Customer_Po_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Tooling_PO_Date ? pattern.Tooling_PO_Date.split('T')[0] : ''}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Purchase_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Purchase_Date ? pattern.Purchase_Date.split('T')[0] : ''}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={pattern.Pattern_Maker_Name} maxLength={20} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Pattern_Material_Details}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Quoted_Estimated_Weight}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Patterns_Set}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Pattern_Pieces}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Rack_Location}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Box_Per_Heat}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Material_Details}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Location}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_S7_F4_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_S7_F4_Date ? pattern.Core_Box_S7_F4_Date.split('T')[0] : ''}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Core_Box_Set}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Box_Pieces}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Total_Weight}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Type}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Main_Core}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Side_Core}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Loose_Core}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chaplets_COPE}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chaplets_DRAG}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chills_COPE}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Chills_DRAG}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Mould_Vents_Size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Mould_Vents_No}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.shell_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.coldBox_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.noBake_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.mainCore_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.sideCore_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.looseCore_qty}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.breaker_core_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.down_sprue_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.foam_filter_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.sand_riser_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.no_of_sand_riser}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.ingate_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.no_of_ingate}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.runner_bar_size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.runner_bar_no}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.rev_no_status}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.date ? pattern.date.split('T')[0] : ''}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
-                                                <TextTooltip text={pattern.comment} maxLength={20} />
-                                            </td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Moulding_Box_Size}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.No_Of_Cavities}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Bunch_Wt}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.YieldPercent}</td>
-                                            <td style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{pattern.Core_Wt}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {selectedId && (
-                    <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#DBEAFE', borderRadius: '0.375rem', fontSize: '0.875rem', color: '#1E40AF' }}>
-                        <strong>Selected Pattern ID: {selectedId}</strong> - Click DELETE to remove or CLEAR to deselect.
-                    </div>
-                )}
-            </div>
-
-            {/* Parts Records Table */}
-            <PartsTable searchQuery={searchQuery} refreshTrigger={refreshTrigger} />
-
-            {/* Sleeves Records Table */}
-            <SleevesTable searchQuery={searchQuery} refreshTrigger={refreshTrigger} />
+            {/* Unified Records Table - Shows patterns with expandable parts/sleeves */}
+            <UnifiedRecordsTable 
+                searchQuery={debouncedSearchTerm} 
+                refreshTrigger={refreshTrigger} 
+                onRowClick={handleRowClick}
+                selectedId={selectedId}
+            />
 
             {/* Pattern Return History Section */}
             <PatternReturnSection />
+            </>
+            ) : (
+                <PatternHistoryTab />
+            )}
 
             <AlertDialog
                 isOpen={showDeleteDialog}

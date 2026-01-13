@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
-import { FileText, Play, Eye, Download, Trash2, Plus, X, Clock, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { FiFileText, FiPlay, FiEye, FiDownload, FiTrash2, FiPlus, FiX, FiClock, FiCalendar, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 
 const ReportBuilder = () => {
     const queryClient = useQueryClient();
@@ -93,7 +93,7 @@ const ReportBuilder = () => {
         onSuccess: (data) => {
             toast.success(`PDF generated! ${data.rowCount} rows, ${data.executionTime}`);
             queryClient.invalidateQueries({ queryKey: ['reportLogs'] });
-            // Trigger download - use direct path since downloadUrl already includes /api
+            // Trigger FiDownload - use direct path since downloadUrl already includes /api
             window.open(data.downloadUrl, '_blank');
         },
         onError: (error) => {
@@ -130,9 +130,9 @@ const ReportBuilder = () => {
 
     const getStatusIcon = (status) => {
         switch (status) {
-            case 'success': return <CheckCircle size={14} color="#22C55E" />;
-            case 'failed': return <XCircle size={14} color="#EF4444" />;
-            default: return <Clock size={14} color="#F59E0B" />;
+            case 'success': return <FiCheckCircle size={14} color="#22C55E" />;
+            case 'failed': return <FiXCircle size={14} color="#EF4444" />;
+            default: return <FiClock size={14} color="#F59E0B" />;
         }
     };
 
@@ -156,7 +156,7 @@ const ReportBuilder = () => {
                     onClick={() => { resetForm(); setShowForm(true); }}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
-                    <Plus size={16} /> New Report
+                    <FiPlus size={16} /> New Report
                 </button>
             </div>
 
@@ -177,7 +177,7 @@ const ReportBuilder = () => {
                                 {editingReport ? 'Edit Report' : 'Create New Report'}
                             </h3>
                             <button onClick={resetForm} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <X size={20} />
+                                <FiX size={20} />
                             </button>
                         </div>
 
@@ -284,7 +284,7 @@ const ReportBuilder = () => {
                                 </p>
                             </div>
                             <button onClick={() => setPreviewData(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <X size={20} />
+                                <FiX size={20} />
                             </button>
                         </div>
 
@@ -321,14 +321,14 @@ const ReportBuilder = () => {
             {/* Reports Table */}
             <div style={{ marginBottom: '2rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={18} /> Report Templates ({reports.length})
+                    <FiFileText size={18} /> Report Templates ({reports.length})
                 </h3>
 
                 {isLoading ? (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Loading reports...</div>
                 ) : reports.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280', backgroundColor: '#F9FAFB', borderRadius: '0.5rem' }}>
-                        <FileText size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                        <FiFileText size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                         <p>No reports created yet</p>
                         <p style={{ fontSize: '0.875rem' }}>Click "New Report" to create your first report template</p>
                     </div>
@@ -367,7 +367,7 @@ const ReportBuilder = () => {
                                                     title="Preview Data"
                                                     style={{ padding: '0.375rem', backgroundColor: '#DBEAFE', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}
                                                 >
-                                                    <Eye size={14} color="#2563EB" />
+                                                    <FiEye size={14} color="#2563EB" />
                                                 </button>
                                                 <button 
                                                     onClick={() => executeMutation.mutate(report.ReportId)}
@@ -375,14 +375,14 @@ const ReportBuilder = () => {
                                                     title="Generate PDF"
                                                     style={{ padding: '0.375rem', backgroundColor: '#DCFCE7', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}
                                                 >
-                                                    <Download size={14} color="#16A34A" />
+                                                    <FiDownload size={14} color="#16A34A" />
                                                 </button>
                                                 <button 
                                                     onClick={() => openEdit(report)}
                                                     title="Edit"
                                                     style={{ padding: '0.375rem', backgroundColor: '#FEF3C7', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}
                                                 >
-                                                    <FileText size={14} color="#D97706" />
+                                                    <FiFileText size={14} color="#D97706" />
                                                 </button>
                                                 <button 
                                                     onClick={() => {
@@ -393,7 +393,7 @@ const ReportBuilder = () => {
                                                     title="Delete"
                                                     style={{ padding: '0.375rem', backgroundColor: '#FEE2E2', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}
                                                 >
-                                                    <Trash2 size={14} color="#DC2626" />
+                                                    <FiTrash2 size={14} color="#DC2626" />
                                                 </button>
                                             </div>
                                         </td>
@@ -408,7 +408,7 @@ const ReportBuilder = () => {
             {/* Execution Logs */}
             <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Clock size={18} /> Recent Executions
+                    <FiClock size={18} /> Recent Executions
                 </h3>
 
                 {logs.length === 0 ? (
@@ -437,12 +437,12 @@ const ReportBuilder = () => {
                                         <td style={{ padding: '0.5rem' }}>
                                             {log.PdfFileName ? (
                                                 <a 
-                                                    href={`/api/reports/download/${log.PdfFileName}`}
+                                                    href={`/api/reports/FiDownload/${log.PdfFileName}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     style={{ color: '#2563EB', textDecoration: 'underline' }}
                                                 >
-                                                    Download
+                                                    FiDownload
                                                 </a>
                                             ) : log.ErrorMessage ? (
                                                 <span style={{ color: '#EF4444', fontSize: '0.75rem' }} title={log.ErrorMessage}>

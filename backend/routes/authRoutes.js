@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const { loginSchema, validateBody } = require('../utils/validators');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '8h';
@@ -35,10 +36,10 @@ router.post('/register', verifyToken, requireRole('admin'), async (req, res) => 
     }
 });
 
-// Login
-router.post('/login', async (req, res) => {
+// Login - validateBody validates and sanitizes input via Zod
+router.post('/login', validateBody(loginSchema), async (req, res) => {
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+    // Validation already done by middleware, proceed directly
 
     try {
         const result = await req.db.request().query`SELECT * FROM Users WHERE Username = ${username} AND IsActive = 1`;
@@ -55,8 +56,8 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign({
             id: user.Id,
             username: user.Username,
-            role: user.Role,
-            allowedPages: allowedPages
+            role: user.Role
+            // allowedPages removed to reduce token size and force DB lookup
         }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
         res.cookie('token', token, {
@@ -64,7 +65,9 @@ router.post('/login', async (req, res) => {
             // Only set secure if the request is actually secure (HTTPS)
             // This allows login on HTTP LAN IPs (e.g. 192.168.x.x)
             secure: req.secure || req.protocol === 'https',
-            sameSite: 'lax', // Relaxed slightly from 'strict' for better compatibility
+            // Use 'strict' in production for better CSRF protection, 'lax' in dev for compatibility
+            //sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+            sameSite: 'lax',
             maxAge: 8 * 60 * 60 * 1000 // 8 hours
         });
 

@@ -8,15 +8,17 @@ const router = express.Router();
 const { getPool } = require('../config/db');
 const { requireRole } = require('../middleware/authMiddleware');
 const { startSchedule, stopSchedule, reloadSchedules, getSchedulerStatus } = require('../services/schedulerService');
+const { cacheMiddleware } = require('../utils/cache');
+const { validateBody, scheduleSchema } = require('../utils/validators');
 
 // All routes require admin role
 router.use(requireRole('admin'));
 
 /**
  * GET /api/schedules
- * Get all schedules with report info
+ * Get all schedules with report info - cached 60 seconds
  */
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware('schedules-list', 60), async (req, res) => {
     try {
         const pool = getPool('IcSoftVer3');
         const result = await pool.request().query(`
@@ -35,9 +37,9 @@ router.get('/', async (req, res) => {
 
 /**
  * POST /api/schedules
- * Create new schedule
+ * Create new schedule - with validation
  */
-router.post('/', async (req, res) => {
+router.post('/', validateBody(scheduleSchema), async (req, res) => {
     try {
         const { ReportId, ScheduleName, Frequency, DayOfWeek, DayOfMonth, TimeOfDay } = req.body;
         
@@ -179,9 +181,9 @@ router.post('/:id/toggle', async (req, res) => {
 
 /**
  * GET /api/schedules/status
- * Get scheduler status
+ * Get scheduler status - cached 30 seconds
  */
-router.get('/status/info', async (req, res) => {
+router.get('/status/info', cacheMiddleware('scheduler-status', 30), async (req, res) => {
     try {
         const status = getSchedulerStatus();
         res.json(status);

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
-import { Calendar, Clock, Play, Pause, Trash2, Plus, X, RefreshCw } from 'lucide-react';
+import { FiCalendar, FiClock, FiPlay, FiPause, FiTrash2, FiPlus, FiX, FiRefreshCw } from 'react-icons/fi';
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -43,7 +43,7 @@ const ReportScheduler = () => {
             const response = await api.get('/schedules/status/info');
             return response.data;
         },
-        refetchInterval: 30000 // Refresh every 30 seconds
+        refetchInterval: 60000 // Refresh every 60 seconds (increased for performance)
     });
 
     // Create schedule
@@ -164,14 +164,14 @@ const ReportScheduler = () => {
                             alignItems: 'center'
                         }}
                     >
-                        <RefreshCw size={16} className={reloadMutation.isPending ? 'animate-spin' : ''} />
+                        <FiRefreshCw size={16} className={reloadMutation.isPending ? 'animate-spin' : ''} />
                     </button>
                     <button 
                         className="btn btn-primary" 
                         onClick={() => setShowForm(true)}
                         style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                     >
-                        <Plus size={16} /> New Schedule
+                        <FiPlus size={16} /> New Schedule
                     </button>
                 </div>
             </div>
@@ -216,7 +216,7 @@ const ReportScheduler = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
                             <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Create Schedule</h3>
                             <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <X size={20} />
+                                <FiX size={20} />
                             </button>
                         </div>
 
@@ -337,14 +337,14 @@ const ReportScheduler = () => {
             {/* Schedules Table */}
             <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Calendar size={18} /> Scheduled Reports ({schedules.length})
+                    <FiCalendar size={18} /> Scheduled Reports ({schedules.length})
                 </h3>
 
                 {isLoading ? (
                     <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Loading schedules...</div>
                 ) : schedules.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280', backgroundColor: '#F9FAFB', borderRadius: '0.5rem' }}>
-                        <Clock size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                        <FiClock size={40} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                         <p>No schedules created yet</p>
                         <p style={{ fontSize: '0.875rem' }}>Click "New Schedule" to automate report generation</p>
                     </div>
@@ -366,11 +366,11 @@ const ReportScheduler = () => {
                                         <td style={{ padding: '0.75rem 0.5rem' }}>
                                             {schedule.IsActive ? (
                                                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#22C55E' }}>
-                                                    <Play size={14} /> Active
+                                                    <FiPlay size={14} /> Active
                                                 </span>
                                             ) : (
                                                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#6B7280' }}>
-                                                    <Pause size={14} /> Paused
+                                                    <FiPause size={14} /> Paused
                                                 </span>
                                             )}
                                         </td>
@@ -399,7 +399,7 @@ const ReportScheduler = () => {
                                                 <button 
                                                     onClick={() => toggleMutation.mutate(schedule.ScheduleId)}
                                                     disabled={toggleMutation.isPending}
-                                                    title={schedule.IsActive ? 'Pause' : 'Resume'}
+                                                    title={schedule.IsActive ? 'FiPause' : 'Resume'}
                                                     style={{ 
                                                         padding: '0.375rem', 
                                                         backgroundColor: schedule.IsActive ? '#FEF3C7' : '#DCFCE7', 
@@ -408,7 +408,7 @@ const ReportScheduler = () => {
                                                         cursor: 'pointer' 
                                                     }}
                                                 >
-                                                    {schedule.IsActive ? <Pause size={14} color="#D97706" /> : <Play size={14} color="#16A34A" />}
+                                                    {schedule.IsActive ? <FiPause size={14} color="#D97706" /> : <FiPlay size={14} color="#16A34A" />}
                                                 </button>
                                                 <button 
                                                     onClick={() => {
@@ -419,7 +419,7 @@ const ReportScheduler = () => {
                                                     title="Delete"
                                                     style={{ padding: '0.375rem', backgroundColor: '#FEE2E2', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}
                                                 >
-                                                    <Trash2 size={14} color="#DC2626" />
+                                                    <FiTrash2 size={14} color="#DC2626" />
                                                 </button>
                                             </div>
                                         </td>

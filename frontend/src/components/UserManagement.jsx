@@ -3,28 +3,48 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
 import { validateUserRegistration } from '../utils/validation';
+import { AlertDialog } from './common';
 
 // Available pages for permission assignment
 const AVAILABLE_PAGES = [
-    { id: 'dashboard', label: 'Dashboard', path: '/' },
+    { id: 'homepage', label: 'Homepage', path: '/', isLocked: true },
+    { id: 'sales-dashboard', label: 'Sales Dashboard', path: '/sales-dashboard' },
+    { id: 'finance-dashboard', label: 'Finance Dashboard', path: '/finance-dashboard' },
+    { id: 'ar-ap-dashboard', label: 'AR Dashboard', path: '/ar-ap-dashboard' },
+    { id: 'production-dashboard', label: 'Production Dashboard', path: '/production-dashboard' },
     { id: 'pattern-master', label: 'Pattern Master', path: '/pattern-master' },
+    { id: 'pattern-history', label: 'Pattern History', path: '/pattern-master', isSubTab: true, parent: 'pattern-master' },
     { id: 'planning-master', label: 'Planning', path: '/planning-master' },
+    { id: 'planning-schedule', label: 'Planning Schedule Qty', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
+    { id: 'planning-entry', label: 'Planning Entry', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
+    { id: 'planning-sleeve', label: 'Sleeve Requirement', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
+    { id: 'planning-sleeve-indent', label: 'Sleeve Indent', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
     { id: 'lab-master', label: 'Lab Master', path: '/lab-master' },
+    { id: 'drawing-master', label: 'Drawing Master', path: '/lab-master', isSubTab: true, parent: 'lab-master' },
+    { id: 'drawing-details', label: 'Drawing Details', path: '/lab-master', isSubTab: true, parent: 'lab-master' },
     { id: 'melting', label: 'Melting', path: '/melting' },
+    { id: 'quality-lab', label: 'Quality & Lab', path: '/quality-lab' },
+    { id: 'quality-lab-physical', label: 'Physical Properties', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
+    { id: 'quality-lab-micro', label: 'Microstructure & Hardness', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
+    { id: 'quality-lab-sand', label: 'Sand Properties', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
+    { id: 'quality-lab-chemistry', label: 'Chemistry (Spectro)', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
+    { id: 'quality-lab-mould', label: 'Mould Hardness', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
+    { id: 'it-management', label: 'IT Management', path: '/it-management' },
     { id: 'database-explorer', label: 'Database Explorer', path: '/database-explorer' },
 ];
 
+
 const UserManagement = () => {
     const queryClient = useQueryClient();
-    const [formData, setFormData] = useState({ 
-        username: '', 
-        password: '', 
-        fullName: '', 
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+        fullName: '',
         role: 'employee',
-        allowedPages: ['dashboard']
+        allowedPages: ['homepage']
     });
     const [errors, setErrors] = useState({});
-    
+
     // Edit modal state
     const [editingUser, setEditingUser] = useState(null);
     const [editFormData, setEditFormData] = useState({
@@ -33,6 +53,9 @@ const UserManagement = () => {
         password: '',
         allowedPages: []
     });
+
+    // Delete confirmation state
+    const [userToDelete, setUserToDelete] = useState(null);
 
     // Fetch all users
     const { data: users = [], isLoading: usersLoading } = useQuery({
@@ -50,7 +73,7 @@ const UserManagement = () => {
         },
         onSuccess: () => {
             toast.message('Success', { description: 'User registered successfully!' });
-            setFormData({ username: '', password: '', fullName: '', role: 'employee', allowedPages: ['dashboard'] });
+            setFormData({ username: '', password: '', fullName: '', role: 'employee', allowedPages: ['homepage'] });
             setErrors({});
             queryClient.invalidateQueries({ queryKey: ['users'] });
         },
@@ -74,12 +97,26 @@ const UserManagement = () => {
         }
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: async (id) => {
+            const response = await api.delete(`/users/${id}`);
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('User deleted successfully!');
+            queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.error || 'Delete failed');
+        }
+    });
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const validationErrors = validateUserRegistration(formData);
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
-            toast.error('Please fix the validation errors.');
+            toast.error('Please complete all required fields before submitting.');
             return;
         }
         setErrors({});
@@ -87,13 +124,24 @@ const UserManagement = () => {
     };
 
     const handlePageToggle = (pageId, isEdit = false) => {
+        const page = AVAILABLE_PAGES.find(p => p.id === pageId);
+        
+        // Don't allow toggling locked pages (Homepage)
+        if (page?.isLocked) return;
+        
         const setter = isEdit ? setEditFormData : setFormData;
         setter(prev => {
             const currentPages = prev.allowedPages || [];
+            
+            // If toggling a parent page (like quality-lab)
+            const subTabs = AVAILABLE_PAGES.filter(p => p.parent === pageId);
+            
             if (currentPages.includes(pageId)) {
-                if (pageId === 'dashboard') return prev;
-                return { ...prev, allowedPages: currentPages.filter(p => p !== pageId) };
+                // Unchecking parent - also remove all its sub-tabs
+                const subTabIds = subTabs.map(s => s.id);
+                return { ...prev, allowedPages: currentPages.filter(p => p !== pageId && !subTabIds.includes(p)) };
             } else {
+                // Checking parent - just add the parent, user can select sub-tabs manually
                 return { ...prev, allowedPages: [...currentPages, pageId] };
             }
         });
@@ -106,7 +154,7 @@ const UserManagement = () => {
 
     const handleDeselectAll = (isEdit = false) => {
         const setter = isEdit ? setEditFormData : setFormData;
-        setter(prev => ({ ...prev, allowedPages: ['dashboard'] }));
+        setter(prev => ({ ...prev, allowedPages: ['homepage'] }));
     };
 
     const openEditModal = (user) => {
@@ -126,7 +174,7 @@ const UserManagement = () => {
         if (editFormData.fullName !== editingUser.FullName) updateData.fullName = editFormData.fullName;
         if (editFormData.password) updateData.password = editFormData.password;
         updateData.allowedPages = editFormData.allowedPages;
-        
+
         updateMutation.mutate({ id: editingUser.Id, data: updateData });
     };
 
@@ -197,11 +245,127 @@ const UserManagement = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
-                                    {AVAILABLE_PAGES.map(page => (
-                                        <label key={page.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', cursor: page.id === 'dashboard' ? 'not-allowed' : 'pointer' }}>
-                                            <input type="checkbox" checked={formData.allowedPages?.includes(page.id)} onChange={() => handlePageToggle(page.id, false)} disabled={page.id === 'dashboard'} />
-                                            {page.label}
-                                        </label>
+                                    {AVAILABLE_PAGES.filter(page => !page.isSubTab).map(page => (
+                                        <React.Fragment key={page.id}>
+                                            <label style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: '0.25rem', 
+                                                fontSize: '0.75rem', 
+                                                cursor: page.isLocked ? 'not-allowed' : 'pointer',
+                                                opacity: page.isLocked ? 0.7 : 1
+                                            }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.allowedPages?.includes(page.id)} 
+                                                    onChange={() => handlePageToggle(page.id, false)} 
+                                                    disabled={page.isLocked}
+                                                />
+                                                {page.label}
+                                                {page.isLocked && <span style={{ fontSize: '0.6rem', color: '#9CA3AF' }}>(required)</span>}
+                                            </label>
+                                            {/* Show sub-tabs if parent is checked */}
+                                            {page.id === 'pattern-master' && formData.allowedPages?.includes('pattern-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#F5F3FF', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #C4B5FD',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#7C3AED', fontWeight: '500', marginBottom: '0.25rem' }}>Pattern Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'pattern-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={formData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, false)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'planning-master' && formData.allowedPages?.includes('planning-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#FEF3C7', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #FCD34D',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#D97706', fontWeight: '500', marginBottom: '0.25rem' }}>Planning Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'planning-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={formData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, false)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'lab-master' && formData.allowedPages?.includes('lab-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#ECFDF5', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #A7F3D0',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: '500', marginBottom: '0.25rem' }}>Lab Master Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'lab-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={formData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, false)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'quality-lab' && formData.allowedPages?.includes('quality-lab') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#F0F9FF', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #BFDBFE',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#3B82F6', fontWeight: '500', marginBottom: '0.25rem' }}>Department Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'quality-lab').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={formData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, false)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </React.Fragment>
                                     ))}
                                 </div>
                             </div>
@@ -248,9 +412,18 @@ const UserManagement = () => {
                                             <td style={{ padding: '0.75rem 0.5rem' }}>{getAccessBadges(user.AllowedPages)}</td>
                                             <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                                                 {user.Role !== 'admin' && (
-                                                    <button onClick={() => openEditModal(user)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.75rem' }}>
-                                                        Edit
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                                        <button onClick={() => openEditModal(user)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                                                            Edit
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setUserToDelete(user)} 
+                                                            style={{ padding: '0.25rem 0.75rem', backgroundColor: '#EF4444', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                            disabled={deleteMutation.isPending}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>
@@ -267,7 +440,7 @@ const UserManagement = () => {
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
                     <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', padding: '1.5rem', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto' }}>
                         <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Edit User: {editingUser.Username}</h3>
-                        
+
                         <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Username</label>
@@ -291,11 +464,127 @@ const UserManagement = () => {
                                     </div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
-                                    {AVAILABLE_PAGES.map(page => (
-                                        <label key={page.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem', cursor: page.id === 'dashboard' ? 'not-allowed' : 'pointer' }}>
-                                            <input type="checkbox" checked={editFormData.allowedPages?.includes(page.id)} onChange={() => handlePageToggle(page.id, true)} disabled={page.id === 'dashboard'} />
-                                            {page.label}
-                                        </label>
+                                    {AVAILABLE_PAGES.filter(page => !page.isSubTab).map(page => (
+                                        <React.Fragment key={page.id}>
+                                            <label style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: '0.25rem', 
+                                                fontSize: '0.8rem', 
+                                                cursor: page.isLocked ? 'not-allowed' : 'pointer',
+                                                opacity: page.isLocked ? 0.7 : 1
+                                            }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={editFormData.allowedPages?.includes(page.id)} 
+                                                    onChange={() => handlePageToggle(page.id, true)} 
+                                                    disabled={page.isLocked}
+                                                />
+                                                {page.label}
+                                                {page.isLocked && <span style={{ fontSize: '0.6rem', color: '#9CA3AF' }}>(required)</span>}
+                                            </label>
+                                            {/* Show sub-tabs if parent is checked */}
+                                            {page.id === 'pattern-master' && editFormData.allowedPages?.includes('pattern-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#F5F3FF', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #C4B5FD',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#7C3AED', fontWeight: '500', marginBottom: '0.25rem' }}>Pattern Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'pattern-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={editFormData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, true)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'planning-master' && editFormData.allowedPages?.includes('planning-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#FEF3C7', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #FCD34D',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#D97706', fontWeight: '500', marginBottom: '0.25rem' }}>Planning Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'planning-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={editFormData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, true)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'lab-master' && editFormData.allowedPages?.includes('lab-master') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#ECFDF5', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #A7F3D0',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: '500', marginBottom: '0.25rem' }}>Lab Master Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'lab-master').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={editFormData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, true)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {page.id === 'quality-lab' && editFormData.allowedPages?.includes('quality-lab') && (
+                                                <div style={{ 
+                                                    gridColumn: '1 / -1', 
+                                                    marginLeft: '1.5rem', 
+                                                    padding: '0.5rem', 
+                                                    backgroundColor: '#F0F9FF', 
+                                                    borderRadius: '0.25rem',
+                                                    border: '1px solid #BFDBFE',
+                                                    marginBottom: '0.25rem'
+                                                }}>
+                                                    <div style={{ fontSize: '0.65rem', color: '#3B82F6', fontWeight: '500', marginBottom: '0.25rem' }}>Department Tabs:</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                        {AVAILABLE_PAGES.filter(p => p.parent === 'quality-lab').map(subTab => (
+                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={editFormData.allowedPages?.includes(subTab.id)} 
+                                                                    onChange={() => handlePageToggle(subTab.id, true)} 
+                                                                />
+                                                                {subTab.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </React.Fragment>
                                     ))}
                                 </div>
                             </div>
@@ -312,6 +601,22 @@ const UserManagement = () => {
                     </div>
                 </div>
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog
+                isOpen={!!userToDelete}
+                title="Delete User"
+                message={`Are you sure you want to delete the user "${userToDelete?.Username}"? This action cannot be undone.`}
+                onConfirm={() => {
+                    deleteMutation.mutate(userToDelete.Id);
+                    setUserToDelete(null);
+                }}
+                onCancel={() => setUserToDelete(null)}
+                confirmText="Delete"
+                cancelText="Cancel"
+                isDanger={true}
+                isLoading={deleteMutation.isPending}
+            />
         </div>
     );
 };

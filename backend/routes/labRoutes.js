@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { sql } = require('../config/db');
+const { requirePage } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
+const { validateBody, labMasterSchema } = require('../utils/validators');
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -17,25 +19,27 @@ router.get('/', async (req, res) => {
                 Customer, DrgNo, Description, Grade, PartWeight,
                 MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
                 C, Si, Mn, P, S,
-                Cr, Cu, Mg_Chem, CE,
+                Cr, Cu, Mg_Chem, CE, Nickel, Moly,
                 CRCA, RR, PIG, MS, Mg_Mix,
                 RegularCritical, LastBoxTemp, Remarks,
                 CreatedAt, UpdatedAt
             FROM LabMaster
         `;
 
+        const request = req.db.request();
         if (search) {
+            request.input('search', sql.NVarChar, `%${search}%`);
             query += ` WHERE 
-                Customer LIKE '%${search}%' OR 
-                DrgNo LIKE '%${search}%' OR 
-                Grade LIKE '%${search}%' OR
-                Description LIKE '%${search}%'
+                Customer LIKE @search OR 
+                DrgNo LIKE @search OR 
+                Grade LIKE @search OR
+                Description LIKE @search
             `;
         }
 
         query += ' ORDER BY LabMasterId ASC';
 
-        const result = await req.db.request().query(query);
+        const result = await request.query(query);
         res.json(result.recordset);
     } catch (err) {
         console.error('Error fetching lab master records:', err);
@@ -67,14 +71,14 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /lab-master - Create new lab master record
-router.post('/', async (req, res) => {
+router.post('/', requirePage('lab-master'), validateBody(labMasterSchema), async (req, res) => {
     const {
         // Details
         Customer, DrgNo, Description, Grade, PartWeight,
         MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
         // Final Chemistry
         C, Si, Mn, P, S,
-        Cr, Cu, Mg_Chem, CE,
+        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
         // Charge Mix
         CRCA, RR, PIG, MS, Mg_Mix,
         // Others
@@ -82,6 +86,20 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     try {
+        // Check for duplicate DrgNo before inserting
+        if (DrgNo && DrgNo.trim() !== '') {
+            const checkRequest = new sql.Request(req.db);
+            checkRequest.input('DrgNo', sql.NVarChar(100), DrgNo);
+            const existingCheck = await checkRequest.query`
+                SELECT LabMasterId FROM LabMaster WHERE DrgNo = @DrgNo
+            `;
+            if (existingCheck.recordset.length > 0) {
+                return res.status(400).json({ 
+                    error: `Drawing No "${DrgNo}" already exists. Each entry must have a unique Drawing No.` 
+                });
+            }
+        }
+
         const request = new sql.Request(req.db);
 
         // Details inputs
@@ -105,6 +123,8 @@ router.post('/', async (req, res) => {
         request.input('Cu', sql.NVarChar(50), Cu || null);
         request.input('Mg_Chem', sql.NVarChar(50), Mg_Chem || null);
         request.input('CE', sql.NVarChar(50), CE || null);
+        request.input('Nickel', sql.NVarChar(50), Nickel || null);
+        request.input('Moly', sql.NVarChar(50), Moly || null);
 
         // Charge Mix inputs
         request.input('CRCA', sql.NVarChar(100), CRCA || null);
@@ -123,7 +143,7 @@ router.post('/', async (req, res) => {
                 Customer, DrgNo, Description, Grade, PartWeight,
                 MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
                 C, Si, Mn, P, S,
-                Cr, Cu, Mg_Chem, CE,
+                Cr, Cu, Mg_Chem, CE, Nickel, Moly,
                 CRCA, RR, PIG, MS, Mg_Mix,
                 RegularCritical, LastBoxTemp, Remarks
             )
@@ -132,7 +152,7 @@ router.post('/', async (req, res) => {
                 @Customer, @DrgNo, @Description, @Grade, @PartWeight,
                 @MinMaxThickness, @ThicknessGroup, @BaseChe_C, @BaseChe_Si,
                 @C, @Si, @Mn, @P, @S,
-                @Cr, @Cu, @Mg_Chem, @CE,
+                @Cr, @Cu, @Mg_Chem, @CE, @Nickel, @Moly,
                 @CRCA, @RR, @PIG, @MS, @Mg_Mix,
                 @RegularCritical, @LastBoxTemp, @Remarks
             )
@@ -151,13 +171,13 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /lab-master/:id - Update existing lab master record
-router.put('/:id', async (req, res) => {
+router.put('/:id', requirePage('lab-master'), async (req, res) => {
     const { id } = req.params;
     const {
         Customer, DrgNo, Description, Grade, PartWeight,
         MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
         C, Si, Mn, P, S,
-        Cr, Cu, Mg_Chem, CE,
+        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
         CRCA, RR, PIG, MS, Mg_Mix,
         RegularCritical, LastBoxTemp, Remarks
     } = req.body;
@@ -187,6 +207,8 @@ router.put('/:id', async (req, res) => {
         request.input('Cu', sql.NVarChar(50), Cu || null);
         request.input('Mg_Chem', sql.NVarChar(50), Mg_Chem || null);
         request.input('CE', sql.NVarChar(50), CE || null);
+        request.input('Nickel', sql.NVarChar(50), Nickel || null);
+        request.input('Moly', sql.NVarChar(50), Moly || null);
 
         // Charge Mix inputs
         request.input('CRCA', sql.NVarChar(100), CRCA || null);
@@ -221,6 +243,8 @@ router.put('/:id', async (req, res) => {
                 Cu = @Cu,
                 Mg_Chem = @Mg_Chem,
                 CE = @CE,
+                Nickel = @Nickel,
+                Moly = @Moly,
                 CRCA = @CRCA,
                 RR = @RR,
                 PIG = @PIG,
@@ -245,7 +269,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /lab-master/:id - Delete lab master record
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePage('lab-master'), async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -268,7 +292,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /lab-master/import-excel - Import lab master records from Excel
-router.post('/import-excel', upload.single('file'), async (req, res) => {
+router.post('/import-excel', requirePage('lab-master'), upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -277,7 +301,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
         // Parse the Excel file from buffer using ExcelJS
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(req.file.buffer);
-        
+
         const worksheet = workbook.worksheets[0];
         if (!worksheet || worksheet.rowCount < 2) {
             return res.status(400).json({ error: 'Excel file is empty or has no data rows' });
@@ -290,7 +314,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
             // Clean the header value (remove extra spaces, handle newlines)
             let value = cell.value ? String(cell.value).trim() : '';
             // Basic cleanup to match variations
-            value = value.replace(/\s+/g, ' '); 
+            value = value.replace(/\s+/g, ' ');
             headers[colNumber] = value;
         });
 
@@ -298,7 +322,9 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
 
         let successCount = 0;
         let errorCount = 0;
+        let skippedCount = 0;
         const errors = [];
+        const skippedRows = [];
 
 
 
@@ -313,7 +339,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
             'Part Weight': 'PartWeight',
             'Min-Max Thickness': 'MinMaxThickness',
             'Thickness Group': 'ThicknessGroup',
-            
+
             // Base Chemistry - Handle variations in spacing
             'BASE CHEMISTRY C %': 'BaseChe_C',
             'BASE CHEMISTRY Si %': 'BaseChe_Si',
@@ -330,6 +356,8 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
             'Cu %': 'Cu',
             'Mg %': 'Mg_Chem', // Critical: Mg % -> Mg_Chem
             'CE %': 'CE',
+            'Nickel %': 'Nickel',
+            'Moly %': 'Moly',
 
             // Charge Mix - Kgs
             'CRCA': 'CRCA',
@@ -337,7 +365,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
             'PIG': 'PIG',
             'MS': 'MS',
             'Mg': 'Mg_Mix',    // Critical: Plain Mg -> Mg_Mix
-            
+
             // Others
             'Regular / Critical': 'RegularCritical',
             'Last Box Temp': 'LastBoxTemp',
@@ -346,19 +374,19 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
 
         // Build column index to db field mapping
         const columnIndexToField = {};
-        
+
         // FIRST: Hardcode Base Chemistry columns by position (columns 9 and 10)
         // since they have the same names as Final Chemistry but are in Row 1 merged cell
         columnIndexToField['9'] = 'BaseChe_C';
         columnIndexToField['10'] = 'BaseChe_Si';
-        
+
         for (const [colNumber, header] of Object.entries(headers)) {
             // Skip columns 9 and 10 - already mapped to Base Chemistry
             if (colNumber === '9' || colNumber === '10') continue;
-            
+
             // Try direct match
             let dbField = columnMap[header];
-            
+
             if (dbField) {
                 columnIndexToField[colNumber] = dbField;
             }
@@ -390,13 +418,43 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
             // Skip empty rows
             if (row.cellCount === 0) continue;
             try {
+                // Get key fields for duplicate check
+                const drgNo = getMappedValue(row, 'DrgNo');
+                const customer = getMappedValue(row, 'Customer');
+                const grade = getMappedValue(row, 'Grade');
+
+                // Skip rows with no DrgNo (required field)
+                if (!drgNo || drgNo.trim() === '') {
+                    skippedCount++;
+                    skippedRows.push(`Row ${rowNumber}: Missing DrgNo`);
+                    continue;
+                }
+
+                // Check for duplicate - record with same DrgNo, Customer, and Grade
+                const checkRequest = new sql.Request(req.db);
+                checkRequest.input('DrgNo', sql.NVarChar(100), drgNo);
+                checkRequest.input('Customer', sql.NVarChar(255), customer || '');
+                checkRequest.input('Grade', sql.NVarChar(100), grade || '');
+
+                const existingCheck = await checkRequest.query`
+                    SELECT LabMasterId FROM LabMaster 
+                    WHERE DrgNo = @DrgNo AND Customer = @Customer AND Grade = @Grade
+                `;
+
+                if (existingCheck.recordset.length > 0) {
+                    // Duplicate found - skip this row
+                    skippedCount++;
+                    skippedRows.push(`Row ${rowNumber}: Duplicate (DrgNo: ${drgNo})`);
+                    continue;
+                }
+
                 const request = new sql.Request(req.db);
 
                 // Map Excel columns to database fields
-                request.input('Customer', sql.NVarChar(255), getMappedValue(row, 'Customer'));
-                request.input('DrgNo', sql.NVarChar(100), getMappedValue(row, 'DrgNo'));
+                request.input('Customer', sql.NVarChar(255), customer);
+                request.input('DrgNo', sql.NVarChar(100), drgNo);
                 request.input('Description', sql.NVarChar(500), getMappedValue(row, 'Description'));
-                request.input('Grade', sql.NVarChar(100), getMappedValue(row, 'Grade'));
+                request.input('Grade', sql.NVarChar(100), grade);
                 request.input('PartWeight', sql.NVarChar(100), getMappedValue(row, 'PartWeight'));
                 request.input('MinMaxThickness', sql.NVarChar(100), getMappedValue(row, 'MinMaxThickness'));
                 request.input('ThicknessGroup', sql.NVarChar(100), getMappedValue(row, 'ThicknessGroup'));
@@ -411,6 +469,8 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
                 request.input('Cu', sql.NVarChar(50), getMappedValue(row, 'Cu'));
                 request.input('Mg_Chem', sql.NVarChar(50), getMappedValue(row, 'Mg_Chem'));
                 request.input('CE', sql.NVarChar(50), getMappedValue(row, 'CE'));
+                request.input('Nickel', sql.NVarChar(50), getMappedValue(row, 'Nickel'));
+                request.input('Moly', sql.NVarChar(50), getMappedValue(row, 'Moly'));
                 request.input('CRCA', sql.NVarChar(100), getMappedValue(row, 'CRCA'));
                 request.input('RR', sql.NVarChar(100), getMappedValue(row, 'RR'));
                 request.input('PIG', sql.NVarChar(100), getMappedValue(row, 'PIG'));
@@ -425,7 +485,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
                         Customer, DrgNo, Description, Grade, PartWeight,
                         MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
                         C, Si, Mn, P, S,
-                        Cr, Cu, Mg_Chem, CE,
+                        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
                         CRCA, RR, PIG, MS, Mg_Mix,
                         RegularCritical, LastBoxTemp, Remarks
                     )
@@ -433,7 +493,7 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
                         @Customer, @DrgNo, @Description, @Grade, @PartWeight,
                         @MinMaxThickness, @ThicknessGroup, @BaseChe_C, @BaseChe_Si,
                         @C, @Si, @Mn, @P, @S,
-                        @Cr, @Cu, @Mg_Chem, @CE,
+                        @Cr, @Cu, @Mg_Chem, @CE, @Nickel, @Moly,
                         @CRCA, @RR, @PIG, @MS, @Mg_Mix,
                         @RegularCritical, @LastBoxTemp, @Remarks
                     )
@@ -447,10 +507,12 @@ router.post('/import-excel', upload.single('file'), async (req, res) => {
 
         res.json({
             success: true,
-            message: `Import completed. ${successCount} records imported successfully.`,
+            message: `Import completed. ${successCount} new records imported, ${skippedCount} duplicates skipped.`,
             successCount,
+            skippedCount,
             errorCount,
-            errors: errors.slice(0, 10) // Return first 10 errors only
+            errors: errors.slice(0, 10), // Return first 10 errors only
+            skippedRows: skippedRows.slice(0, 10) // Return first 10 skipped rows
         });
     } catch (err) {
         console.error('Error importing Excel file:', err);

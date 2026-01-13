@@ -1,6 +1,7 @@
 import React from 'react';
-import { FiSearch, FiBell, FiUser, FiMenu } from 'react-icons/fi';
-import DatabaseSelector from '../DatabaseSelector';
+
+import { FiMenu } from 'react-icons/fi';
+import NotificationBell from '../common/NotificationBell';
 
 const Header = ({ user, onMenuClick }) => {
     return (
@@ -42,65 +43,15 @@ const Header = ({ user, onMenuClick }) => {
                 </button>
 
                 <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
-                    Dashboard
+                    AKP FOUNDRIES PVT LTD
                 </h2>
             </div>
 
             {/* Right Section */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {user?.role === 'admin' && (
-                    <div className="desktop-only">
-                        <DatabaseSelector />
-                    </div>
-                )}
-
-                {/* Search - Desktop Only (Admin only) */}
-                {user?.role === 'admin' && (
-                    <div className="desktop-only" style={{ position: 'relative' }}>
-                        <label htmlFor="global-search" className="sr-only">Search</label>
-                        <FiSearch
-                            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}
-                            aria-hidden="true"
-                        />
-                        <input
-                            id="global-search"
-                            type="text"
-                            placeholder="Search..."
-                            style={{
-                                padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                                borderRadius: '0.375rem',
-                                border: '1px solid #E5E7EB',
-                                outline: 'none',
-                                fontSize: '0.875rem',
-                                width: '240px',
-                                backgroundColor: '#F9FAFB'
-                            }}
-                            aria-label="Global search"
-                        />
-                    </div>
-                )}
-
-                {/* Notifications - Desktop Only */}
-                <button
-                    className="desktop-only"
-                    style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}
-                    aria-label="Notifications (1 unread)"
-                >
-                    <FiBell size={20} />
-                    <span
-                        style={{
-                            position: 'absolute',
-                            top: '-2px',
-                            right: '-2px',
-                            width: '8px',
-                            height: '8px',
-                            backgroundColor: '#EF4444',
-                            borderRadius: '50%'
-                        }}
-                        aria-hidden="true"
-                    ></span>
-                </button>
-
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {/* Notification Bell */}
+                <NotificationBell />
+                
                 {/* User Profile */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }} role="complementary" aria-label="User information">
                     <div

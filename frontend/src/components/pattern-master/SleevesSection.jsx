@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { labelStyle, inputStyle, selectStyle } from './styles';
+import SearchableSelect from '../common/SearchableSelect';
 
 const SleevesSection = ({
     sleeveRows,
@@ -46,23 +47,19 @@ const SleevesSection = ({
                         {errors[`sleeve_${index}_name`] && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>{errors[`sleeve_${index}_name`]}</span>}
                     </div>
 
-                    {/* Sleeve Type & Size - Dynamic from RawMaterial */}
+                    {/* Sleeve Type & Size - Searchable */}
                     <div>
                         <label style={labelStyle}>
                             Sleeve Name & Size {index === 0 && <span style={{ color: '#DC2626' }}>*</span>}
                         </label>
-                        <select
+                        <SearchableSelect
+                            options={sleeveOptions}
                             value={row.sleeve_type_size}
                             onChange={(e) => onSleeveRowChange(index, 'sleeve_type_size', e.target.value)}
-                            style={selectStyle}
-                        >
-                            <option value="">Select Name & Size</option>
-                            {sleeveOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            name={`sleeve_type_size_${index}`}
+                            placeholder="Search sleeve..."
+                            isClearable={true}
+                        />
                         {errors[`sleeve_${index}_size`] && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>{errors[`sleeve_${index}_size`]}</span>}
                     </div>
 

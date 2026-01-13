@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TableSkeleton from '../common/TableSkeleton';
 import TextTooltip from '../common/TextTooltip';
+import DatePicker from '../common/DatePicker';
 
 const PatternReturnSection = () => {
     const [showForm, setShowForm] = useState(false);
@@ -426,7 +427,7 @@ const PatternReturnSection = () => {
                                         />
                                     </div>
 
-                                    {/* Customer Dropdown */}
+                                    {/* Customer Dropdown - Auto-populated from pattern, read-only */}
                                     <div className="form-group">
                                         <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', fontSize: '0.875rem' }}>
                                             Customer <span style={{ color: '#EF4444' }}>*</span>
@@ -435,10 +436,17 @@ const PatternReturnSection = () => {
                                             value={selectedCustomer}
                                             onChange={handleCustomerChange}
                                             options={customerOptions}
-                                            isClearable
-                                            isSearchable
-                                            placeholder="Select Customer..."
-                                            styles={selectStyles}
+                                            isDisabled={true}
+                                            placeholder="Auto-populated from Pattern"
+                                            styles={{
+                                                ...selectStyles,
+                                                control: (base) => ({
+                                                    ...base,
+                                                    minHeight: '38px',
+                                                    fontSize: '0.875rem',
+                                                    backgroundColor: '#F3F4F6'
+                                                })
+                                            }}
                                         />
                                     </div>
 
@@ -462,12 +470,11 @@ const PatternReturnSection = () => {
                                         <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', fontSize: '0.875rem' }}>
                                             Return Date <span style={{ color: '#EF4444' }}>*</span>
                                         </label>
-                                        <input
-                                            type="date"
+                                        <DatePicker
                                             name="ReturnDate"
                                             value={formData.ReturnDate}
                                             onChange={handleInputChange}
-                                            className="input-field"
+                                            placeholder="Select return date..."
                                         />
                                     </div>
 
