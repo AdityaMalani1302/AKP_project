@@ -271,24 +271,72 @@ npm start
 
 ---
 
-### Running as Windows Services (Optional - Auto-start)
+### Running as Windows Services (Recommended for Production)
 
-#### Backend Service using PM2:
+#### Option 1: Using Startup Scripts (Easiest)
+
+```powershell
+# Start the entire system
+C:\AKP_project\start-erp.bat
+
+# Stop the entire system
+C:\AKP_project\stop-erp.bat
+```
+
+#### Option 2: Manual PM2 Setup
 
 ```powershell
 # Install PM2 globally
 npm install -g pm2
 npm install -g pm2-windows-startup
 
-# Start backend with PM2
-cd C:\AKP_project\backend
-pm2 start npm --name "erp-backend" -- start
+# Start backend with PM2 using ecosystem config
+cd C:\AKP_project
+pm2 start ecosystem.config.json
 
 # Save PM2 config
 pm2 save
 
 # Set to auto-start on Windows boot
 pm2-startup install
+```
+
+#### PM2 Management Commands
+
+```powershell
+# View running processes
+pm2 list
+
+# View logs
+pm2 logs akp-erp-backend
+
+# Restart backend
+pm2 restart akp-erp-backend
+
+# Stop backend
+pm2 stop akp-erp-backend
+```
+
+---
+
+### Health Check Endpoint
+
+Monitor system status:
+
+```
+GET https://YOUR_TUNNEL_URL/api/health
+```
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-01-13T12:00:00.000Z",
+  "uptime": 3600,
+  "environment": "production",
+  "database": "connected"
+}
 ```
 
 ---
@@ -368,6 +416,94 @@ For business continuity, the company should create its own accounts:
 ### Issue: Tunnel URL changed
 
 **Solution**: Update `VITE_API_URL` in Vercel and redeploy
+
+---
+
+## 🌐 Custom Domain Migration (erp.akpfoundries.com)
+
+When ready to migrate from quick tunnel to permanent custom domain:
+
+### Step 1: Move DNS to Cloudflare
+
+1. **Sign up at** [cloudflare.com](https://cloudflare.com) (free)
+2. **Add site**: Enter `akpfoundries.com`
+3. **Select Free plan**
+4. **Cloudflare will scan existing DNS records** - verify they're correct
+5. **Update nameservers at Hostinger**:
+   - Go to Hostinger → Domain → DNS Settings
+   - Change nameservers to Cloudflare's (shown after adding site)
+   - Wait 10-60 minutes for propagation
+
+### Step 2: Create Named Tunnel
+
+```powershell
+# Login to Cloudflare
+cloudflared tunnel login
+
+# Create named tunnel
+cloudflared tunnel create akp-erp-api
+
+# Note the tunnel ID from output
+```
+
+### Step 3: Configure Tunnel
+
+Edit `C:\AKP_project\cloudflare-tunnel-config.yml`:
+
+```yaml
+tunnel: YOUR_TUNNEL_ID
+credentials-file: C:\Users\YOUR_USERNAME\.cloudflared\YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: api.akpfoundries.com
+    service: http://localhost:5000
+  - service: http_status:404
+```
+
+### Step 4: Route DNS
+
+```powershell
+cloudflared tunnel route dns akp-erp-api api.akpfoundries.com
+```
+
+### Step 5: Run Named Tunnel
+
+```powershell
+cloudflared tunnel --config C:\AKP_project\cloudflare-tunnel-config.yml run
+```
+
+### Step 6: Add Custom Domain to Vercel
+
+1. Go to Vercel → Project → Settings → Domains
+2. Add `erp.akpfoundries.com`
+3. Add CNAME record in Cloudflare DNS:
+   - Name: `erp`
+   - Target: `cname.vercel-dns.com`
+
+### Step 7: Update Environment Variables
+
+1. **Vercel**: Update `VITE_API_URL` to `https://api.akpfoundries.com`
+2. **Backend .env**: Update `FRONTEND_URL` to `https://erp.akpfoundries.com`
+3. Restart backend and redeploy Vercel
+
+### Final URLs
+
+| Service     | URL                            |
+| ----------- | ------------------------------ |
+| Frontend    | `https://erp.akpfoundries.com` |
+| Backend API | `https://api.akpfoundries.com` |
+
+---
+
+## 📁 Production Files Reference
+
+| File                           | Purpose                        |
+| ------------------------------ | ------------------------------ |
+| `ecosystem.config.json`        | PM2 configuration              |
+| `start-erp.bat`                | Start entire system            |
+| `stop-erp.bat`                 | Stop entire system             |
+| `cloudflare-tunnel-config.yml` | Named tunnel template          |
+| `backend/.env.example`         | Environment variables template |
 
 ---
 

@@ -48,7 +48,7 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
     process.env.CORS_ORIGIN,      // e.g., http://192.168.1.10:5173
-    process.env.FRONTEND_URL       // Vercel/Netlify URL for cloud deployment
+    process.env.FRONTEND_URL       // Production frontend URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -76,6 +76,11 @@ app.use(cors({
             return callback(null, true);
         }
 
+        // Allow AKP Foundries domain (production)
+        if (/^https?:\/\/(.*\.)?akpfoundries\.com$/.test(origin)) {
+            return callback(null, true);
+        }
+
         callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -93,6 +98,19 @@ if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'deploymen
     // The catch-all *must* be the very last route after all API routes.
     // However, static files (images, js, css) should be served here.
 }
+
+// Health Check Endpoint (no auth required)
+app.get('/api/health', (req, res) => {
+    const { getPool } = require('./config/db');
+    const dbPool = getPool('IcSoftVer3');
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        database: dbPool ? 'connected' : 'disconnected'
+    });
+});
 
 // Database Connection on Startup
 connectSQL();

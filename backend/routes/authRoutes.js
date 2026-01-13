@@ -60,9 +60,12 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
             // allowedPages removed to reduce token size and force DB lookup
         }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
-        // For cross-origin deployment (Vercel frontend → Cloudflare tunnel backend)
+        // For cross-origin deployment (frontend and backend on different domains)
         // sameSite: 'none' + secure: true is required
-        const isCloudDeployment = process.env.FRONTEND_URL && process.env.FRONTEND_URL.includes('vercel.app');
+        const frontendUrl = process.env.FRONTEND_URL || '';
+        const isCloudDeployment = frontendUrl.includes('vercel.app') || 
+                                   frontendUrl.includes('akpfoundries.com') ||
+                                   req.get('origin')?.includes('akpfoundries.com');
         
         res.cookie('token', token, {
             httpOnly: true,
@@ -82,7 +85,10 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
 
 // Logout
 router.post('/logout', (req, res) => {
-    const isCloudDeployment = process.env.FRONTEND_URL && process.env.FRONTEND_URL.includes('vercel.app');
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    const isCloudDeployment = frontendUrl.includes('vercel.app') || 
+                               frontendUrl.includes('akpfoundries.com') ||
+                               req.get('origin')?.includes('akpfoundries.com');
     res.clearCookie('token', {
         httpOnly: true,
         secure: isCloudDeployment || req.secure || req.protocol === 'https',
