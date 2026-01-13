@@ -60,14 +60,16 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
             // allowedPages removed to reduce token size and force DB lookup
         }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
+        // For cross-origin deployment (Vercel frontend → Cloudflare tunnel backend)
+        // sameSite: 'none' + secure: true is required
+        const isCloudDeployment = process.env.FRONTEND_URL && process.env.FRONTEND_URL.includes('vercel.app');
+        
         res.cookie('token', token, {
             httpOnly: true,
-            // Only set secure if the request is actually secure (HTTPS)
-            // This allows login on HTTP LAN IPs (e.g. 192.168.x.x)
-            secure: req.secure || req.protocol === 'https',
-            // Use 'strict' in production for better CSRF protection, 'lax' in dev for compatibility
-            //sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
-            sameSite: 'lax',
+            // secure must be true for sameSite: 'none'
+            secure: isCloudDeployment || req.secure || req.protocol === 'https',
+            // Use 'none' for cross-origin (cloud), 'lax' for same-origin (local)
+            sameSite: isCloudDeployment ? 'none' : 'lax',
             maxAge: 8 * 60 * 60 * 1000 // 8 hours
         });
 
@@ -80,7 +82,12 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
 
 // Logout
 router.post('/logout', (req, res) => {
-    res.clearCookie('token');
+    const isCloudDeployment = process.env.FRONTEND_URL && process.env.FRONTEND_URL.includes('vercel.app');
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: isCloudDeployment || req.secure || req.protocol === 'https',
+        sameSite: isCloudDeployment ? 'none' : 'lax'
+    });
     res.json({ success: true, message: 'Logged out successfully' });
 });
 
