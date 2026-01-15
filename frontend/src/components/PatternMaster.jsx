@@ -140,6 +140,7 @@ const PatternMaster = () => {
         {
             sleeve_name: '',
             sleeve_type_size: '',
+            sleeve_type_size_name: '',
             quantity: ''
         }
     ]);
@@ -311,8 +312,7 @@ const PatternMaster = () => {
             toast.success('Pattern deleted successfully!');
             queryClient.invalidateQueries(['patterns']);
             setRefreshTrigger(prev => prev + 1);
-            setSelectedId(null);
-            setIsEditing(false);
+            handleClear(); // Reset all form fields after deletion
             setShowDeleteDialog(false);
         },
         onError: (error) => {
@@ -333,27 +333,22 @@ const PatternMaster = () => {
         setSearchTerm(e.target.value);
     };
 
-    // Row click handler for editing - can accept pattern object or full data
+    // Row click handler for editing - always fetches full pattern details from API
     const handleRowClick = async (patternOrData) => {
         const patternId = patternOrData.PatternId;
         setSelectedId(patternId);
         setIsEditing(true);
         
-        // Check if we already have full data (has 'parts' property) or need to fetch
+        // Always fetch full pattern details from API to ensure proper data structure
+        // The unified-data endpoint has a different format that doesn't work for form editing
         let data;
-        if (patternOrData.parts !== undefined) {
-            // Full data already provided
-            data = patternOrData;
-        } else {
-            // Fetch full pattern details
-            try {
-                const response = await api.get(`/pattern-master/${patternId}`);
-                data = response.data;
-            } catch (err) {
-                console.error('Error loading pattern details:', err);
-                toast.error('Failed to load pattern details for editing');
-                return;
-            }
+        try {
+            const response = await api.get(`/pattern-master/${patternId}`);
+            data = response.data;
+        } catch (err) {
+            console.error('Error loading pattern details:', err);
+            toast.error('Failed to load pattern details for editing');
+            return;
         }
 
         // Populate Main Details
@@ -479,12 +474,15 @@ const PatternMaster = () => {
         if (sleeves && sleeves.length > 0) {
             const formattedSleeves = sleeves.map(sleeve => ({
                 sleeve_name: sleeve.sleeve_name || '',
-                sleeve_type_size: sleeve.sleeve_type_size || '',
+                // Convert sleeve_type_size to number for proper matching with sleeveOptions
+                sleeve_type_size: sleeve.sleeve_type_size ? parseInt(sleeve.sleeve_type_size) || sleeve.sleeve_type_size : '',
+                // Keep the display name for the SearchableSelect to show
+                sleeve_type_size_name: sleeve.sleeve_type_size_name || '',
                 quantity: sleeve.quantity || ''
             }));
             setSleeveRows(formattedSleeves);
         } else {
-            setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
+            setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', sleeve_type_size_name: '', quantity: '' }]);
         }
     };
 
@@ -535,7 +533,7 @@ const PatternMaster = () => {
             foam_filter_size: '', sand_riser_size: '', no_of_sand_riser: '',
             ingate_size: '', no_of_ingate: '', runner_bar_size: '', runner_bar_no: ''
         });
-        setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
+        setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', sleeve_type_size_name: '', quantity: '' }]);
         setAdditionalData({ rev_no_status: '', date: '', comment: '' });
         setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
         setErrors({});
@@ -622,6 +620,7 @@ const PatternMaster = () => {
         setSleeveRows(prev => [...prev, {
             sleeve_name: '',
             sleeve_type_size: '',
+            sleeve_type_size_name: '',
             quantity: ''
         }]);
     }, []);

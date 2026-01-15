@@ -53,7 +53,13 @@ const SleevesSection = ({
                             Sleeve Name & Size {index === 0 && <span style={{ color: '#DC2626' }}>*</span>}
                         </label>
                         <SearchableSelect
-                            options={sleeveOptions}
+                            options={
+                                // Ensure currently selected value shows even if not in sleeveOptions yet
+                                // eslint-disable-next-line eqeqeq
+                                row.sleeve_type_size && row.sleeve_type_size_name && !sleeveOptions.find(opt => opt.value == row.sleeve_type_size)
+                                    ? [{ value: row.sleeve_type_size, label: row.sleeve_type_size_name }, ...sleeveOptions]
+                                    : sleeveOptions
+                            }
                             value={row.sleeve_type_size}
                             onChange={(e) => onSleeveRowChange(index, 'sleeve_type_size', e.target.value)}
                             name={`sleeve_type_size_${index}`}

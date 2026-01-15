@@ -4,21 +4,28 @@ import './Combobox.css';
 
 const Combobox = ({ options = [], value, onChange, placeholder, label, disabled = false }) => {
     const [open, setOpen] = useState(false);
-    // Initialize inputValue - find matching option label or fallback to value
-    const getDisplayValue = (val) => {
-        if (val == null || val === '') return '';
-        const matchingOption = options.find(opt => opt.value === val);
-        return matchingOption ? matchingOption.label : String(val);
-    };
-    const [inputValue, setInputValue] = useState(getDisplayValue(value));
     const inputRef = useRef(null);
     const wrapperRef = useRef(null);
+    
+    // Initialize inputValue - find matching option label or fallback to value
+    // Use loose equality (==) to handle number/string type mismatches
+    const getDisplayValue = React.useCallback((val) => {
+        if (val == null || val === '') return '';
+        // eslint-disable-next-line eqeqeq
+        const matchingOption = options.find(opt => opt.value == val);
+        return matchingOption ? matchingOption.label : '';
+    }, [options]);
+    
+    const [inputValue, setInputValue] = useState(() => getDisplayValue(value));
 
-    // Sync inputValue with value prop when value changes externally
+    // Sync inputValue with value prop when value or options change externally
     useEffect(() => {
         const displayVal = getDisplayValue(value);
-        setInputValue(displayVal);
-    }, [value, options]);
+        // Only update if we found a valid display value or if value is cleared
+        if (displayVal || value == null || value === '') {
+            setInputValue(displayVal);
+        }
+    }, [value, options, getDisplayValue]);
 
     // Handle clicking outside to close and accept value
     useEffect(() => {
@@ -43,8 +50,9 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
     };
 
     const handleSelectOption = (optionValue) => {
-        // Find the option to display its label
-        const selectedOption = options.find(opt => opt.value === optionValue);
+        // Find the option to display its label (use loose equality for type safety)
+        // eslint-disable-next-line eqeqeq
+        const selectedOption = options.find(opt => opt.value == optionValue);
         setInputValue(selectedOption ? selectedOption.label : String(optionValue));
         onChange(optionValue);
         setOpen(false);
@@ -73,7 +81,8 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
         });
     }, [options]);
 
-    const selectedOption = uniqueOptions.find(opt => opt.value === value);
+    // eslint-disable-next-line eqeqeq
+    const selectedOption = uniqueOptions.find(opt => opt.value == value);
     const selectedLabel = selectedOption ? selectedOption.label : '';
     
     const searchValue = inputValue != null ? String(inputValue).toLowerCase() : '';
@@ -127,10 +136,12 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
                                     key={option.value}
                                     value={option.value}
                                     onSelect={() => handleSelectOption(option.value)}
-                                    className={`combobox-item ${value === option.value ? 'selected' : ''}`}
+                                    // eslint-disable-next-line eqeqeq
+                                    className={`combobox-item ${value == option.value ? 'selected' : ''}`}
                                 >
                                     {option.label}
-                                    {value === option.value && <span className="check">✓</span>}
+                                    {/* eslint-disable-next-line eqeqeq */}
+                                    {value == option.value && <span className="check">✓</span>}
                                 </Command.Item>
                             ))}
                         </Command.List>

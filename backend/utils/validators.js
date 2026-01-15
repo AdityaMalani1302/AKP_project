@@ -165,10 +165,11 @@ const validateBody = (schema) => {
         try {
             const result = schema.safeParse(req.body);
             if (!result.success) {
-                const errors = result.error.errors.map(err => ({
-                    field: err.path.join('.'),
-                    message: err.message
-                }));
+                // Add safety check for result.error and result.error.errors
+                const errors = result.error?.errors?.map(err => ({
+                    field: err.path?.join('.') || 'unknown',
+                    message: err.message || 'Validation error'
+                })) || [{ field: 'unknown', message: 'Validation failed' }];
                 return res.status(400).json({ 
                     error: 'Validation failed', 
                     details: errors 

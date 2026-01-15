@@ -57,7 +57,12 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
                         label={<>Supplier Pattern Maker <span style={{ color: 'red' }}>*</span></>}
                         value={data.Pattern_Maker ? data.Pattern_Maker.value : ''}
                         onChange={handleMakerChange}
-                        options={suppliers}
+                        options={
+                            // Ensure the currently selected option is in the list even if suppliers haven't loaded yet
+                            data.Pattern_Maker && data.Pattern_Maker.value && !suppliers.find(s => s.value === data.Pattern_Maker.value)
+                                ? [{ value: data.Pattern_Maker.value, label: data.Pattern_Maker.label }, ...suppliers]
+                                : suppliers
+                        }
                         placeholder="Select Pattern Maker..."
                     />
                     {errors.Pattern_Maker && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>{errors.Pattern_Maker}</span>}

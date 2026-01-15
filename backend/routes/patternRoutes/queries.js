@@ -121,6 +121,7 @@ router.get('/unified-data', async (req, res) => {
                 pm.Serial_No,
                 pm.date,
                 c.CustName AS CustomerName,
+                pm.Pattern_Maker,
                 s.SupName AS Pattern_Maker_Name,
                 pm.Box_Per_Heat,
                 pm.Total_Weight,
@@ -315,7 +316,14 @@ router.get('/:id', async (req, res) => {
         request.input('id', sql.Numeric(18, 0), parseInt(id));
 
         const patternResult = await request.query`
-            SELECT * FROM PatternMaster WHERE PatternId = @id
+            SELECT 
+                pm.*,
+                c.CustName AS CustomerName,
+                s.SupName AS Pattern_Maker_Name
+            FROM PatternMaster pm
+            LEFT JOIN Customer c ON pm.Customer = c.CustId
+            LEFT JOIN Invent_Supplier s ON pm.Pattern_Maker = s.SupId
+            WHERE pm.PatternId = @id
         `;
 
         if (patternResult.recordset.length === 0) {

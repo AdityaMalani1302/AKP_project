@@ -158,7 +158,9 @@ const SearchableSelect = ({
             if (!value || !Array.isArray(value)) return [];
             return options.filter(opt => value.includes(opt.value));
         }
-        return options.find(opt => opt.value === value) || null;
+        // Use loose equality to handle string/number type mismatches (e.g., "123" == 123)
+        // eslint-disable-next-line eqeqeq
+        return options.find(opt => opt.value == value) || null;
     };
 
     return (

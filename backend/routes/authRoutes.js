@@ -63,9 +63,12 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
         // For cross-origin deployment (frontend and backend on different domains)
         // sameSite: 'none' + secure: true is required
         const frontendUrl = process.env.FRONTEND_URL || '';
+        const origin = req.get('origin') || '';
         const isCloudDeployment = frontendUrl.includes('vercel.app') || 
                                    frontendUrl.includes('akpfoundries.com') ||
-                                   req.get('origin')?.includes('akpfoundries.com');
+                                   origin.includes('akpfoundries.com') ||
+                                   origin.includes('vercel.app') ||
+                                   origin.includes('trycloudflare.com');
         
         res.cookie('token', token, {
             httpOnly: true,
@@ -86,9 +89,12 @@ router.post('/login', validateBody(loginSchema), async (req, res) => {
 // Logout
 router.post('/logout', (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || '';
+    const origin = req.get('origin') || '';
     const isCloudDeployment = frontendUrl.includes('vercel.app') || 
                                frontendUrl.includes('akpfoundries.com') ||
-                               req.get('origin')?.includes('akpfoundries.com');
+                               origin.includes('akpfoundries.com') ||
+                               origin.includes('vercel.app') ||
+                               origin.includes('trycloudflare.com');
     res.clearCookie('token', {
         httpOnly: true,
         secure: isCloudDeployment || req.secure || req.protocol === 'https',
