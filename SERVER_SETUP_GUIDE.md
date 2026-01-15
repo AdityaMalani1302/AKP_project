@@ -227,47 +227,87 @@ winget install Cloudflare.cloudflared
 
 ---
 
-### Step 7: Start Cloudflare Tunnel
+### Step 7: Install Cloudflared as Windows Service (Recommended)
+
+This makes the tunnel run automatically on boot - no manual intervention needed!
 
 ```powershell
-& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:5000
+# Create config directory
+New-Item -Path "$env:USERPROFILE\.cloudflared" -ItemType Directory -Force
+
+# Create config file
+@"
+url: http://localhost:5000
+"@ | Out-File -FilePath "$env:USERPROFILE\.cloudflared\config.yml" -Encoding utf8
+
+# Install as Windows service (Run PowerShell as Administrator)
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install
+
+# Start the service
+Start-Service cloudflared
 ```
 
-**IMPORTANT**: Copy the tunnel URL shown (e.g., `https://voted-gnome-lawn-recipients.trycloudflare.com`)
+**Get the tunnel URL:**
+
+```powershell
+# Check service logs
+Get-EventLog -LogName Application -Source cloudflared -Newest 10
+```
+
+Look for: `Your quick Tunnel has been created! Visit it at: https://xyz.trycloudflare.com`
 
 ---
 
-### Step 8: Update Vercel (If Tunnel URL Changed)
-
-If the tunnel URL is different from the current one:
+### Step 8: Update Vercel with Tunnel URL
 
 1. Go to https://vercel.com
 2. Login with GitHub account
 3. Select the project
 4. Go to Settings → Environment Variables
-5. Update `VITE_API_URL` with new tunnel URL
+5. Update `VITE_API_URL` with tunnel URL
 6. Go to Deployments → Redeploy
 
 ---
 
 ## 🔄 Daily Operations
 
-### Starting the System (After Server Restart)
+### The System Auto-Starts! ✅
 
-1. **Start Backend**:
+With Windows service installed:
+
+- ✅ Tunnel starts automatically on boot
+- ✅ Tunnel auto-restarts if it crashes
+- ✅ No manual intervention needed
+
+### When Does URL Change?
+
+| Scenario            | URL Changes?               |
+| ------------------- | -------------------------- |
+| Tunnel crashes      | ❌ Same URL (auto-restart) |
+| Server running 24/7 | ❌ Same URL                |
+| **Server reboots**  | ✅ NEW URL (rare)          |
+
+### If Server Reboots (URL Changed):
+
+1. Find new URL: `Get-EventLog -LogName Application -Source cloudflared -Newest 10`
+2. Update Vercel `VITE_API_URL`
+3. Redeploy
+
+### Service Management Commands
 
 ```powershell
-cd C:\AKP_project\backend
-npm start
+# Check status
+Get-Service cloudflared
+
+# Restart
+Restart-Service cloudflared
+
+# Stop
+Stop-Service cloudflared
+
+# Start
+Start-Service cloudflared
 ```
-
-2. **Start Tunnel** (in new PowerShell window):
-
-```powershell
-& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:5000
-```
-
-3. **If tunnel URL changed**, update Vercel (see Step 8)
 
 ---
 

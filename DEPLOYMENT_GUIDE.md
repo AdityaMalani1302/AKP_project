@@ -1,139 +1,154 @@
-# 🚀 Quick Deployment Guide: Cloud Frontend + Local Backend
+# 🚀 AKP Foundries ERP - Production Deployment Guide
 
-This guide deploys your Manufacturing ERP with:
-- **Frontend** on Vercel (free, public URL)
-- **Backend** on company server via Cloudflare Tunnel (free)
-- **Database** stays on your local SQL Server
+## Final Production Architecture
+
+```
+Internet Users → akp-project-taupe.vercel.app (Frontend)
+                         ↓ API calls
+            Cloudflare Tunnel (Windows Service - Auto-starts)
+                         ↓
+          Company Server (Backend + SQL Server 2008 R2)
+```
+
+| Component | Location       | URL                                |
+| --------- | -------------- | ---------------------------------- |
+| Frontend  | Vercel (Cloud) | `akp-project-taupe.vercel.app`     |
+| Backend   | Company Server | `*.trycloudflare.com` (via tunnel) |
+| Database  | Company Server | SQL Server 2008 R2 (localhost)     |
 
 ---
 
-## Step 1: Push Changes to GitHub
+## 🖥️ Company Server Setup (One-Time)
 
-Open PowerShell in your project folder:
+### Step 1: Install Prerequisites
 
 ```powershell
-cd c:\Users\adity\OneDrive\Desktop\AKP_project
-
-git add .
-git commit -m "Add cloud deployment configuration"
-git push
+# 1. Install Node.js (v18+) from https://nodejs.org
+# 2. Verify installation
+node --version
+npm --version
 ```
 
----
-
-## Step 2: Set Up Cloudflare Tunnel on Company Server
-
-### 2.1 Install cloudflared
+### Step 2: Clone Repository
 
 ```powershell
-# Option A: Using winget (recommended)
-winget install Cloudflare.cloudflared
-
-# Option B: Download manually from:
-# https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.msi
+cd C:\
+git clone https://github.com/AdityaMalani1302/AKP_project.git
+cd AKP_project\backend
+npm install
 ```
 
-### 2.2 Start Quick Tunnel (for testing)
+### Step 3: Configure Environment
 
-```powershell
-# This creates a temporary public URL - great for testing!
-cloudflared tunnel --url http://localhost:5000
-```
-
-**Output will look like:**
-```
-Your quick Tunnel has been created! Visit it at:
-https://random-words-here.trycloudflare.com
-```
-
-📝 **Copy this URL** - you'll need it for Vercel!
-
-> ⚠️ Note: Quick tunnels create new URLs each restart. For permanent URLs, see "Permanent Tunnel Setup" section below.
-
----
-
-## Step 3: Deploy Frontend to Vercel
-
-### 3.1 Sign up at [vercel.com](https://vercel.com) (use GitHub login)
-
-### 3.2 Import your project
-1. Click **"Add New..."** → **"Project"**
-2. Select your GitHub repository
-3. Configure build settings:
-   - **Framework Preset**: Vite
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-
-### 3.3 Add Environment Variable
-1. Expand **"Environment Variables"**
-2. Add:
-   - **Name**: `VITE_API_URL`
-   - **Value**: `https://random-words-here.trycloudflare.com` (your tunnel URL)
-
-### 3.4 Click **Deploy**!
-
----
-
-## Step 4: Update Backend CORS (if needed)
-
-If you get CORS errors, add your Vercel URL to backend `.env`:
+Create `C:\AKP_project\backend\.env`:
 
 ```env
-FRONTEND_URL=https://your-app.vercel.app
+SQL_USER=sa
+SQL_PASSWORD=YourSQLPassword
+SQL_SERVER=localhost
+DB_NAME_1=IcSoftVer3
+DB_NAME_2=IcSoftReportVer3
+DB_NAME_3=IcSoftLedgerVer3
+PORT=5000
+NODE_ENV=production
+JWT_SECRET=your-super-secret-key
+CORS_ORIGIN=http://192.168.2.124:5173
+FRONTEND_URL=https://akp-project-taupe.vercel.app
 ```
 
-Then restart the backend server.
-
----
-
-## Step 5: Test Everything
-
-1. ✅ Open your Vercel URL in browser
-2. ✅ Login with your credentials
-3. ✅ Create a pattern entry
-4. ✅ Check SQL Server - data should be there!
-
----
-
-## Permanent Tunnel Setup (Optional)
-
-For a tunnel that doesn't change URL on restart:
+### Step 4: Install Cloudflared
 
 ```powershell
-# Login to Cloudflare (one-time)
-cloudflared tunnel login
+winget install Cloudflare.cloudflared
+```
 
-# Create a named tunnel
-cloudflared tunnel create erp-api
+Or download from: https://github.com/cloudflare/cloudflared/releases
 
-# Run with your tunnel
-cloudflared tunnel run erp-api
+### Step 5: Install Cloudflared as Windows Service
 
-# Install as Windows service (runs on boot)
-cloudflared service install
-net start cloudflared
+```powershell
+# Create config file
+New-Item -Path "$env:USERPROFILE\.cloudflared" -ItemType Directory -Force
+@"
+url: http://localhost:5000
+"@ | Out-File -FilePath "$env:USERPROFILE\.cloudflared\config.yml" -Encoding utf8
+
+# Install as Windows service (Run as Administrator)
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install
+```
+
+### Step 6: Start Everything
+
+```powershell
+# Start backend
+cd C:\AKP_project\backend
+npm start
+
+# Start tunnel service (one-time, then auto-starts on boot)
+Start-Service cloudflared
 ```
 
 ---
 
-## Troubleshooting
+## 📊 Check Tunnel URL
 
-| Issue | Solution |
-|-------|----------|
-| CORS error | Check backend console for the blocked origin, add to FRONTEND_URL |
-| Connection refused | Ensure backend is running on port 5000 |
-| Tunnel stops | Use permanent tunnel setup or restart cloudflared |
-| API 503 error | Database not connected - check SQL Server is running |
+After starting the service:
+
+```powershell
+# View tunnel logs to find the URL
+Get-Content "$env:USERPROFILE\.cloudflared\cloudflared.log" -Tail 50
+```
+
+Look for: `Your quick Tunnel has been created! Visit it at: https://xyz.trycloudflare.com`
 
 ---
 
-## Architecture Summary
+## ⚠️ When Tunnel URL Changes
 
-```
-User Browser → Vercel (React) → Cloudflare Tunnel → Your Server (Node.js) → SQL Server
-     🌐              ☁️                  🔒                💻               🗄️
-   Internet         Cloud            Encrypted          On-Premises       Local DB
+The tunnel URL changes only when:
+
+- ❌ Server reboots completely
+- ❌ Cloudflared service is stopped and started
+
+When this happens (rarely):
+
+1. Find new tunnel URL from logs
+2. Go to **Vercel** → Project → Settings → Environment Variables
+3. Update `VITE_API_URL` to new URL
+4. Click **Redeploy**
+
+---
+
+## 🔧 Useful Commands
+
+```powershell
+# Check service status
+Get-Service cloudflared
+
+# Restart service
+Restart-Service cloudflared
+
+# View logs
+Get-EventLog -LogName Application -Source cloudflared -Newest 20
+
+# Check if backend is running
+Invoke-RestMethod http://localhost:5000/api/health
 ```
 
-All data stays on your company server! 🔐
+---
+
+## 🩺 Troubleshooting
+
+| Issue                | Solution                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| Service not starting | Run `& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install` as Admin |
+| CORS error           | Check `FRONTEND_URL` in `.env` matches Vercel URL                                     |
+| 401 Unauthorized     | Clear browser cookies, login again                                                    |
+| Database error       | Verify SQL Server is running and credentials in `.env`                                |
+
+---
+
+## 📞 Support
+
+- Developer: Aditya Malani
+- Documentation created: January 2026
