@@ -191,7 +191,7 @@ const SystemUserDetailsTab = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB' }}>
                             <tr>
-                                {['ID', 'Asset Tag', 'Assigned User', 'System', 'IP', 'Owner', 'Issue Date'].map(h => (
+                                {['Sr. No.', 'Asset Tag', 'Assigned User', 'System', 'IP', 'Owner', 'Issue Date'].map(h => (
                                     <th key={h} style={{ padding: '0.75rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left' }}>{h}</th>
                                 ))}
                             </tr>
@@ -200,9 +200,9 @@ const SystemUserDetailsTab = () => {
                             {records.length === 0 ? (
                                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>No records</td></tr>
                             ) : (
-                                records.map((r) => (
+                                records.map((r, index) => (
                                     <tr key={r.Id} onClick={() => handleRowClick(r)} style={{ cursor: 'pointer', backgroundColor: selectedId === r.Id ? '#DBEAFE' : 'white' }}>
-                                        <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.Id}</td>
+                                        <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{index + 1}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.AssetTagNumber}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.AssignedUser}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.SystemName}</td>

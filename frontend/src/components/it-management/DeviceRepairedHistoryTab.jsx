@@ -118,13 +118,13 @@ const DeviceRepairedHistoryTab = () => {
                 <div style={{ overflowX: 'auto', maxHeight: '400px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                         <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB' }}>
-                            <tr>{['ID', 'Asset', 'User', 'Dept', 'Date', 'Vendor', 'Issue'].map(h => <th key={h} style={{ padding: '0.75rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left' }}>{h}</th>)}</tr>
+                            <tr>{['Sr. No.', 'Asset', 'User', 'Dept', 'Date', 'Vendor', 'Issue'].map(h => <th key={h} style={{ padding: '0.75rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left' }}>{h}</th>)}</tr>
                         </thead>
                         <tbody>
                             {records.length === 0 ? <tr><td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>No records</td></tr> :
-                                records.map(r => (
+                                records.map((r, index) => (
                                     <tr key={r.RepairId} onClick={() => handleRowClick(r)} style={{ cursor: 'pointer', backgroundColor: selectedId === r.RepairId ? '#DBEAFE' : 'white' }}>
-                                        <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.RepairId}</td>
+                                        <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{index + 1}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.AssetTagNumber}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.IssuedUserName}</td>
                                         <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{r.IssuedDepartment}</td>

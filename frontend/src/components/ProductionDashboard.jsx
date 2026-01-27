@@ -19,6 +19,16 @@ import { Bar, Line, Doughnut, Pie } from 'react-chartjs-2';
 import { format, subMonths } from 'date-fns';
 import api from '../api';
 import ExportButtons from './common/ExportButtons';
+import {
+    applyChartDefaults,
+    CHART_COLORS,
+    getLineChartOptions,
+    getBarChartOptions,
+    getHorizontalBarOptions,
+    getStackedBarOptions,
+    getDoughnutOptions,
+    getMoMGrowthOptions
+} from '../utils/chartConfig';
 import './dashboard/Dashboard.css';
 
 // Register Chart.js components
@@ -36,22 +46,8 @@ ChartJS.register(
     ChartDataLabels
 );
 
-// Disable datalabels globally by default
-ChartJS.defaults.plugins.datalabels = { display: false };
-
-// Set global darker font colors
-ChartJS.defaults.color = '#111827';
-ChartJS.defaults.plugins.legend.labels.color = '#111827';
-ChartJS.defaults.plugins.title.color = '#030712';
-ChartJS.defaults.scale.ticks.color = '#1f2937';
-ChartJS.defaults.scale.title.color = '#1f2937';
-
-// Set global font sizes
-ChartJS.defaults.font.size = 13;
-ChartJS.defaults.plugins.legend.labels.font = { size: 13 };
-ChartJS.defaults.plugins.title.font = { size: 15, weight: 'bold' };
-ChartJS.defaults.scale.ticks.font = { size: 12 };
-ChartJS.defaults.scale.title.font = { size: 13 };
+// Apply global chart defaults from shared config
+applyChartDefaults(ChartJS);
 
 const REFRESH_INTERVAL = 120000; // 2 minutes
 
@@ -273,7 +269,7 @@ const ProductionDashboard = () => {
     // ============================================
 
     const meltingSummary = useMemo(() => {
-        if (!meltingData || meltingData.length === 0) {
+        if (!Array.isArray(meltingData) || meltingData.length === 0) {
             return { totalHeats: 0, totalMetal: 0, avgMetalPerHeat: 0, activeGrades: 0 };
         }
 
@@ -297,7 +293,7 @@ const ProductionDashboard = () => {
 
     // Monthly melting trend
     const meltingMonthlyTrend = useMemo(() => {
-        if (!meltingData || meltingData.length === 0) return null;
+        if (!Array.isArray(meltingData) || meltingData.length === 0) return null;
 
         const monthlyData = {};
 
@@ -323,7 +319,8 @@ const ProductionDashboard = () => {
                     borderColor: 'rgba(37, 99, 235, 1)',
                     borderWidth: 1,
                     borderRadius: 4,
-                    yAxisID: 'y'
+                    yAxisID: 'y',
+                    order: 2
                 },
                 {
                     type: 'line',
@@ -335,7 +332,8 @@ const ProductionDashboard = () => {
                     tension: 0.4,
                     pointRadius: 4,
                     pointBackgroundColor: 'rgba(245, 158, 11, 1)',
-                    yAxisID: 'y1'
+                    yAxisID: 'y1',
+                    order: 1
                 }
             ]
         };
@@ -343,7 +341,7 @@ const ProductionDashboard = () => {
 
     // Grade-wise production breakdown
     const gradeBreakdown = useMemo(() => {
-        if (!meltingData || meltingData.length === 0) return null;
+        if (!Array.isArray(meltingData) || meltingData.length === 0) return null;
 
         const monthGradeData = {};
         const allGrades = new Set();
@@ -386,7 +384,7 @@ const ProductionDashboard = () => {
 
     // Heat efficiency by grade
     const heatEfficiency = useMemo(() => {
-        if (!meltingData || meltingData.length === 0) return null;
+        if (!Array.isArray(meltingData) || meltingData.length === 0) return null;
 
         const gradeData = {};
 
@@ -424,7 +422,7 @@ const ProductionDashboard = () => {
     // ============================================
 
     const productionSummary = useMemo(() => {
-        if (!productionData || productionData.length === 0) {
+        if (!Array.isArray(productionData) || productionData.length === 0) {
             return { totalPoured: 0, totalOk: 0, totalRej: 0, rejectionPct: 0, distinctParts: 0, yieldByPoured: 0 };
         }
 
@@ -452,7 +450,7 @@ const ProductionDashboard = () => {
 
     // Monthly production trend
     const productionMonthlyTrend = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         const monthlyData = {};
 
@@ -479,7 +477,8 @@ const ProductionDashboard = () => {
                     borderColor: 'rgba(107, 114, 128, 1)',
                     borderWidth: 1,
                     borderRadius: 4,
-                    yAxisID: 'y'
+                    yAxisID: 'y',
+                    order: 2
                 },
                 {
                     type: 'line',
@@ -491,7 +490,8 @@ const ProductionDashboard = () => {
                     tension: 0.4,
                     pointRadius: 4,
                     pointBackgroundColor: 'rgba(16, 185, 129, 1)',
-                    yAxisID: 'y'
+                    yAxisID: 'y',
+                    order: 1
                 },
                 {
                     type: 'line',
@@ -503,7 +503,8 @@ const ProductionDashboard = () => {
                     tension: 0.4,
                     pointRadius: 3,
                     pointBackgroundColor: 'rgba(239, 68, 68, 1)',
-                    yAxisID: 'y1'
+                    yAxisID: 'y1',
+                    order: 1
                 }
             ]
         };
@@ -511,7 +512,7 @@ const ProductionDashboard = () => {
 
     // Grade-wise performance (OK vs Rejection)
     const gradePerformance = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         const gradeData = {};
 
@@ -547,7 +548,7 @@ const ProductionDashboard = () => {
 
     // MainGrade rejection %
     const mainGradeRejection = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         const mainGradeData = {};
 
@@ -580,7 +581,7 @@ const ProductionDashboard = () => {
 
     // Part & Box Size productivity
     const partProductivity = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         const partData = {};
 
@@ -595,16 +596,17 @@ const ProductionDashboard = () => {
             partData[key].okWeight += row.OkWeight || 0;
         });
 
-        // Get top 15 parts by OK weight
-        const top15 = Object.entries(partData)
+        // Get top 10 parts by OK weight
+        const top10 = Object.entries(partData)
             .sort((a, b) => b[1].okWeight - a[1].okWeight)
-            .slice(0, 15);
+            .slice(0, 10);
 
         return {
-            labels: top15.map(([part]) => part),
+            labels: top10.map(([part]) => part.length > 15 ? part.substring(0, 13) + '...' : part),
+            fullNames: top10.map(([part]) => part),
             datasets: [{
                 label: 'OK Weight (MT)',
-                data: top15.map(([, data]) => data.okWeight),
+                data: top10.map(([, data]) => data.okWeight),
                 backgroundColor: 'rgba(59, 130, 246, 0.85)',
                 borderRadius: 4
             }]
@@ -632,7 +634,7 @@ const ProductionDashboard = () => {
 
     // Month-over-Month Growth % for OK Weight and Rejection Weight
     const momGrowthData = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         // Group by month
         const monthlyData = {};
@@ -704,7 +706,7 @@ const ProductionDashboard = () => {
 
     // BoxSize Stacked Chart (24*24 and 24*28) by Month - Two-level X-axis
     const boxSizeStackedData = useMemo(() => {
-        if (!productionData || productionData.length === 0) return null;
+        if (!Array.isArray(productionData) || productionData.length === 0) return null;
 
         // Filter for only 24*24 and 24*28 box sizes and group by month
         const monthlyBoxData = {};
@@ -925,7 +927,7 @@ const ProductionDashboard = () => {
         }
     };
 
-    const horizontalBarOptions = {
+    const horizontalBarOptions = useMemo(() => ({
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: 'y',
@@ -933,9 +935,30 @@ const ProductionDashboard = () => {
             legend: { display: false },
             tooltip: {
                 callbacks: {
+                    title: (tooltipItems) => {
+                        if (partProductivity && partProductivity.fullNames) {
+                            return partProductivity.fullNames[tooltipItems[0].dataIndex];
+                        }
+                        return tooltipItems[0].label;
+                    },
                     label: (context) => `${formatWeight(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: true,
+                anchor: 'end',
+                align: 'end',
+                offset: 4,
+                color: '#1F2937',
+                font: {
+                    weight: 'bold',
+                    size: 10
+                },
+                formatter: (value) => formatWeight(value)
             }
+        },
+        layout: {
+            padding: { right: 50 }
         },
         scales: {
             x: {
@@ -943,7 +966,7 @@ const ProductionDashboard = () => {
                 ticks: { callback: (value) => formatWeight(value) }
             }
         }
-    };
+    }), [partProductivity]);
 
     const rejectionBarOptions = {
         responsive: true,
@@ -955,6 +978,14 @@ const ProductionDashboard = () => {
                 callbacks: {
                     label: (context) => `Rejection: ${formatPercent(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: true,
+                color: 'white',
+                anchor: 'center',
+                align: 'center',
+                font: { weight: 'bold', size: 14 },
+                formatter: (value) => formatPercent(value)
             }
         },
         scales: {
@@ -1206,7 +1237,7 @@ const ProductionDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 Monthly Metal & Heats Trend</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : meltingMonthlyTrend ? (
@@ -1234,7 +1265,7 @@ const ProductionDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 Monthly Production Trend</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : productionMonthlyTrend ? (
@@ -1264,7 +1295,7 @@ const ProductionDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Grade-wise Production</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : gradeBreakdown ? (
@@ -1292,7 +1323,7 @@ const ProductionDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Grade-wise OK vs Rejection</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : gradePerformance ? (
@@ -1320,7 +1351,7 @@ const ProductionDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>⚠️ MainGrade Rejection %</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : mainGradeRejection ? (
@@ -1373,7 +1404,7 @@ const ProductionDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🥧 OK vs Rejection Weight</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : okRejectionPieData ? (
@@ -1427,7 +1458,7 @@ const ProductionDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🔧 Top Parts by OK Weight</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : partProductivity ? (
@@ -1438,7 +1469,7 @@ const ProductionDashboard = () => {
                 </div>
             </div>
 
-            {/* MoM Growth % Chart */}
+            {/* MoM Growth % Chart - Styled like Finance Dashboard */}
             <div
                 ref={momGrowthChartRef}
                 style={{ ...chartCardStyle, marginBottom: '1.5rem' }}
@@ -1452,19 +1483,48 @@ const ProductionDashboard = () => {
                                 legend: { position: 'top' },
                                 tooltip: {
                                     callbacks: {
-                                        label: (context) => `${context.dataset.label}: ${context.raw}%`
+                                        label: (context) => `${context.dataset.label}: ${context.raw > 0 ? '+' : ''}${context.raw}%`
                                     }
+                                },
+                                datalabels: {
+                                    display: true,
+                                    color: (context) => {
+                                        const value = context.dataset.data[context.dataIndex];
+                                        const isOkWeight = context.dataset.label.includes('OK');
+                                        // For OK Weight: positive is good (green), negative is bad (red)
+                                        // For Rejection: positive is bad (red), negative is good (green)
+                                        if (isOkWeight) {
+                                            return value >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)';
+                                        } else {
+                                            return value >= 0 ? 'rgba(239, 68, 68, 1)' : 'rgba(34, 197, 94, 1)';
+                                        }
+                                    },
+                                    anchor: 'center',
+                                    align: (context) => {
+                                        const datasetIndex = context.datasetIndex;
+                                        const dataIndex = context.dataIndex;
+                                        const datasets = context.chart.data.datasets;
+                                        const currentVal = datasets[datasetIndex].data[dataIndex];
+                                        const otherVal = datasets[datasetIndex === 0 ? 1 : 0].data[dataIndex];
+                                        return currentVal >= otherVal ? 'top' : 'bottom';
+                                    },
+                                    offset: 6,
+                                    font: { weight: 'bold', size: 13 },
+                                    formatter: (value) => value !== 0 ? `${value > 0 ? '+' : ''}${value}%` : ''
                                 }
                             },
                             scales: {
                                 y: {
                                     beginAtZero: false,
                                     ticks: { callback: (value) => `${value}%` },
-                                    grid: { color: 'rgba(0,0,0,0.05)' }
+                                    grid: { 
+                                        color: (context) => context.tick.value === 0 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)'
+                                    }
                                 },
                                 x: { grid: { display: false } }
-                            }
-                        }} />
+                            },
+                            layout: { padding: { top: 20 } }
+                        }} plugins={[ChartDataLabels]} />
                     ) : <div>No data available</div>
                 })}
                 onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; }}
@@ -1474,7 +1534,7 @@ const ProductionDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 MoM Growth % (OK vs Rejection)</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : momGrowthData ? (
@@ -1485,19 +1545,48 @@ const ProductionDashboard = () => {
                                 legend: { position: 'top' },
                                 tooltip: {
                                     callbacks: {
-                                        label: (context) => `${context.dataset.label}: ${context.raw}%`
+                                        label: (context) => `${context.dataset.label}: ${context.raw > 0 ? '+' : ''}${context.raw}%`
                                     }
+                                },
+                                datalabels: {
+                                    display: true,
+                                    color: (context) => {
+                                        const value = context.dataset.data[context.dataIndex];
+                                        const isOkWeight = context.dataset.label.includes('OK');
+                                        // For OK Weight: positive is good (green), negative is bad (red)
+                                        // For Rejection: positive is bad (red), negative is good (green)
+                                        if (isOkWeight) {
+                                            return value >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)';
+                                        } else {
+                                            return value >= 0 ? 'rgba(239, 68, 68, 1)' : 'rgba(34, 197, 94, 1)';
+                                        }
+                                    },
+                                    anchor: 'center',
+                                    align: (context) => {
+                                        const datasetIndex = context.datasetIndex;
+                                        const dataIndex = context.dataIndex;
+                                        const datasets = context.chart.data.datasets;
+                                        const currentVal = datasets[datasetIndex].data[dataIndex];
+                                        const otherVal = datasets[datasetIndex === 0 ? 1 : 0].data[dataIndex];
+                                        return currentVal >= otherVal ? 'top' : 'bottom';
+                                    },
+                                    offset: 6,
+                                    font: { weight: 'bold', size: 13 },
+                                    formatter: (value) => value !== 0 ? `${value > 0 ? '+' : ''}${value}%` : ''
                                 }
                             },
                             scales: {
                                 y: {
                                     beginAtZero: false,
                                     ticks: { callback: (value) => `${value}%` },
-                                    grid: { color: 'rgba(0,0,0,0.05)' }
+                                    grid: { 
+                                        color: (context) => context.tick.value === 0 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)'
+                                    }
                                 },
                                 x: { grid: { display: false } }
-                            }
-                        }} />
+                            },
+                            layout: { padding: { top: 20 } }
+                        }} plugins={[ChartDataLabels]} />
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>No data available (need at least 2 months)</div>
                     )}
@@ -1526,7 +1615,7 @@ const ProductionDashboard = () => {
                                             else if (label.toLowerCase().includes('ok')) type = 'OK Weight';
                                             else if (label.toLowerCase().includes('poured')) type = 'Poured Weight';
                                             return `${type}: ${formatWeight(context.raw)}`;
-                                        }
+                                        }                                       
                                     }
                                 }
                             },
@@ -1555,7 +1644,7 @@ const ProductionDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📦 BoxSize Production (24x24 vs 24x28)</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : boxSizeStackedData ? (

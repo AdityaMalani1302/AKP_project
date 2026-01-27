@@ -18,6 +18,27 @@ if (missingVars.length > 0) {
 const { connectSQL, sql } = require('./config/db');
 const { verifyToken, requirePage } = require('./middleware/authMiddleware');
 const { authLimiter, apiLimiter } = require('./middleware/rateLimiter');
+const { initScheduler } = require('./services/schedulerService');
+const logger = require('./utils/logger');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+
+// Route Imports
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const patternRoutes = require('./routes/patternRoutes');
+const labRoutes = require('./routes/labRoutes');
+const qualityLabRoutes = require('./routes/qualityLabRoutes'); // Assuming index.js handles export
+const salesDashboardRoutes = require('./routes/salesDashboardRoutes');
+const productionDashboardRoutes = require('./routes/productionDashboardRoutes');
+const financeDashboardRoutes = require('./routes/financeDashboardRoutes');
+const arDashboardRoutes = require('./routes/arDashboardRoutes');
+const itManagementRoutes = require('./routes/itManagementRoutes');
+const marketingRoutes = require('./routes/marketingRoutes');
+const masterRoutes = require('./routes/masterRoutes');
+const planningRoutes = require('./routes/planningRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
+const drawingMasterRoutes = require('./routes/drawingMasterRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,7 +52,7 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", "https://*.trycloudflare.com", "http://localhost:*", "ws://localhost:*"],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
             upgradeInsecureRequests: null, // Explicitly disable HTTPS upgrade
@@ -121,17 +142,9 @@ app.use((req, res, next) => {
     if (req.path === '/api/health') {
         return next();
     }
-    
+
     const { getPool } = require('./config/db');
     // Default to 'IcSoftVer3' (ERP) unless specified otherwise
-    // We could make this dynamic based on route/headers if needed
-    // For now, most routes use IcSoftVer3.
-    // Specifying which DB to use:
-    // Some routes might need specific DBs. 
-    // Ideally, the route handler calls getPool(dbName).
-
-    // For backward compatibility with the monolithic code that used req.db:
-    // We'll attach the main pool.
     const pool = getPool('IcSoftVer3');
     if (pool) {
         req.db = pool;
@@ -142,83 +155,41 @@ app.use((req, res, next) => {
     }
 });
 
+// Request Logging Middleware
+app.use((req, res, next) => {
+    logger.info(`${req.method} ${req.originalUrl}`);
+    next();
+});
+
+// Apply Global Rate Limiting to all API routes
+app.use('/api', apiLimiter);
+
 // --- ROUTES MOUNTING ---
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const masterRoutes = require('./routes/masterRoutes');
-const patternRoutes = require('./routes/patternRoutes');
-const planningRoutes = require('./routes/planningRoutes');
-const labRoutes = require('./routes/labRoutes');
-const qualityLabRoutes = require('./routes/qualityLabRoutes');
-const reportRoutes = require('./routes/reportRoutes');
-const scheduleRoutes = require('./routes/scheduleRoutes');
-const itManagementRoutes = require('./routes/itManagementRoutes');
-
-
-const salesDashboardRoutes = require('./routes/salesDashboardRoutes');
-const financeDashboardRoutes = require('./routes/financeDashboardRoutes');
-const arDashboardRoutes = require('./routes/arDashboardRoutes');
-const productionDashboardRoutes = require('./routes/productionDashboardRoutes');
-const drawingMasterRoutes = require('./routes/drawingMasterRoutes');
-const { initScheduler } = require('./services/schedulerService');
-
-// Auth Routes (Public: Login, Register if admin)
-// Note: /me is protected inside the router
-// Apply rate limiting to auth routes (especially login)
-app.use('/api/auth', authLimiter, authRoutes);
-
-// Protected Routes
-// We apply verifyToken middleware here to protect entire groups of routes
-// requirePage enforces page-level permissions for employees
-app.use('/api/users', verifyToken, userRoutes);
-app.use('/api/pattern-master', verifyToken, patternRoutes);
-app.use('/api/lab-master', verifyToken, labRoutes);
-app.use('/api/quality-lab', verifyToken, requirePage('quality-lab'), qualityLabRoutes);
-
-// Sales & Finance Dashboards (Must be before generic /api routes)
-app.use('/api/sales-dashboard', verifyToken, salesDashboardRoutes);
-app.use('/api/finance-dashboard', verifyToken, financeDashboardRoutes);
-app.use('/api/ar-dashboard', verifyToken, arDashboardRoutes);
-app.use('/api/production-dashboard', verifyToken, productionDashboardRoutes);
-app.use('/api/drawing-master', verifyToken, drawingMasterRoutes);
-
-// Master Data Routes (Customers, Products, etc.)
-// These were previously at /api/customers, /api/products directly.
-// We can mount them at /api to preserve the URL structure, 
-// OR mount at /api/master and update frontend.
-// TO MINIMIZE FRONTEND CHANGES: We mount at /api and use the paths defined in router.
-app.use('/api', verifyToken, masterRoutes);
-
-// Planning Master - Mount at /api since it has multiple paths inside (/planning-master, /raw-materials)
-app.use('/api', verifyToken, requirePage('planning-master'), planningRoutes);
-
-
-
-// Report Automation Routes (admin-only enforced in routers)
-app.use('/api/reports', verifyToken, reportRoutes);
-app.use('/api/schedules', verifyToken, scheduleRoutes);
-app.use('/api/it-management', verifyToken, itManagementRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/pattern-master', patternRoutes);
+app.use('/api/lab-master', labRoutes);
+app.use('/api/quality-lab', qualityLabRoutes);
+app.use('/api/sales-dashboard', salesDashboardRoutes);
+app.use('/api/production-dashboard', productionDashboardRoutes);
+app.use('/api/finance-dashboard', financeDashboardRoutes);
+app.use('/api/ar-dashboard', arDashboardRoutes);
+app.use('/api/it-management', itManagementRoutes);
+app.use('/api/marketing', marketingRoutes);
+app.use('/api/master', masterRoutes);
+app.use('/api/planning', planningRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/schedule', scheduleRoutes);
+app.use('/api/drawing-master', drawingMasterRoutes);
 
 // Centralized Error Handler (must be after all routes)
-const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-
-// 404 for API routes (only if path starts with /api and no route matched)
-app.use('/api', notFoundHandler);
-
-// Error handler (catches errors from all routes)
+app.use('/api', notFoundHandler); // catch 404s for API routes
 app.use(errorHandler);
-
-// Catch-all handler for SPA (Must be after API routes)
-if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'deployment') {
-    app.get(/(.*)/, (req, res) => {
-        res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-    });
-}
 
 // Start Server (Listen on all interfaces for LAN access)
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Local Access: http://localhost:${PORT}`);
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Local Access: http://localhost:${PORT}`);
 
     // Log LAN IP
     const { networkInterfaces } = require('os');
@@ -227,7 +198,7 @@ app.listen(PORT, '0.0.0.0', () => {
         for (const net of nets[name]) {
             // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
             if (net.family === 'IPv4' && !net.internal) {
-                console.log(`LAN Access: http://${net.address}:${PORT}`);
+                logger.info(`LAN Access: http://${net.address}:${PORT}`);
             }
         }
     }

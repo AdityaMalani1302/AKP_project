@@ -31,3 +31,45 @@ BEGIN
     PRINT 'DrawingMaster table already exists.';
 END
 GO
+
+-- Add No column to existing DrawingMaster table
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[DrawingMaster]') AND name = 'No')
+BEGIN
+    ALTER TABLE [dbo].[DrawingMaster]
+    ADD [No] NVARCHAR(50) NULL;
+    
+    PRINT 'No column added to DrawingMaster table.';
+END
+ELSE
+BEGIN
+    PRINT 'No column already exists in DrawingMaster table.';
+END
+GO
+
+-- Add AttachmentName column for storing uploaded file names
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[DrawingMaster]') AND name = 'AttachmentName')
+BEGIN
+    ALTER TABLE [dbo].[DrawingMaster]
+    ADD [AttachmentName] NVARCHAR(255) NULL;
+    
+    PRINT 'AttachmentName column added to DrawingMaster table.';
+END
+ELSE
+BEGIN
+    PRINT 'AttachmentName column already exists in DrawingMaster table.';
+END
+GO
+
+-- Add AttachmentPath column for storing file paths
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[DrawingMaster]') AND name = 'AttachmentPath')
+BEGIN
+    ALTER TABLE [dbo].[DrawingMaster]
+    ADD [AttachmentPath] NVARCHAR(500) NULL;
+    
+    PRINT 'AttachmentPath column added to DrawingMaster table.';
+END
+ELSE
+BEGIN
+    PRINT 'AttachmentPath column already exists in DrawingMaster table.';
+END
+GO

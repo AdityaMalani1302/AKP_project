@@ -9,6 +9,7 @@ import SystemUserDetailsTab from './it-management/SystemUserDetailsTab';
 import DeviceRepairedHistoryTab from './it-management/DeviceRepairedHistoryTab';
 import ComplaintTab from './it-management/ComplaintTab';
 import ITResolvedTab from './it-management/ITResolvedTab';
+import IssuedMaterialTab from './it-management/IssuedMaterialTab';
 import AnimatedTabs from './common/AnimatedTabs';
 
 const ITManagement = () => {
@@ -42,7 +43,8 @@ const ITManagement = () => {
         { id: 'systemuser', label: 'System User Details' },
         { id: 'repaired', label: 'Device Repaired History' },
         { id: 'complaint', label: 'Complaint' },
-        { id: 'resolved', label: 'IT Resolved' }
+        { id: 'resolved', label: 'IT Resolved' },
+        { id: 'issuedmaterial', label: 'Issued Material' }
     ];
 
     const renderTabContent = () => {
@@ -59,6 +61,8 @@ const ITManagement = () => {
                 return <ComplaintTab />;
             case 'resolved':
                 return <ITResolvedTab />;
+            case 'issuedmaterial':
+                return <IssuedMaterialTab />;
             default:
                 return null;
         }

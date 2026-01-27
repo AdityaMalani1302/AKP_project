@@ -4,35 +4,8 @@ import { toast } from 'sonner';
 import api from '../api';
 import { validateUserRegistration } from '../utils/validation';
 import { AlertDialog } from './common';
-
-// Available pages for permission assignment
-const AVAILABLE_PAGES = [
-    { id: 'homepage', label: 'Homepage', path: '/', isLocked: true },
-    { id: 'sales-dashboard', label: 'Sales Dashboard', path: '/sales-dashboard' },
-    { id: 'finance-dashboard', label: 'Finance Dashboard', path: '/finance-dashboard' },
-    { id: 'ar-ap-dashboard', label: 'AR Dashboard', path: '/ar-ap-dashboard' },
-    { id: 'production-dashboard', label: 'Production Dashboard', path: '/production-dashboard' },
-    { id: 'pattern-master', label: 'Pattern Master', path: '/pattern-master' },
-    { id: 'pattern-history', label: 'Pattern History', path: '/pattern-master', isSubTab: true, parent: 'pattern-master' },
-    { id: 'planning-master', label: 'Planning', path: '/planning-master' },
-    { id: 'planning-schedule', label: 'Planning Schedule Qty', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
-    { id: 'planning-entry', label: 'Planning Entry', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
-    { id: 'planning-sleeve', label: 'Sleeve Requirement', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
-    { id: 'planning-sleeve-indent', label: 'Sleeve Indent', path: '/planning-master', isSubTab: true, parent: 'planning-master' },
-    { id: 'lab-master', label: 'Lab Master', path: '/lab-master' },
-    { id: 'drawing-master', label: 'Drawing Master', path: '/lab-master', isSubTab: true, parent: 'lab-master' },
-    { id: 'drawing-details', label: 'Drawing Details', path: '/lab-master', isSubTab: true, parent: 'lab-master' },
-    { id: 'melting', label: 'Melting', path: '/melting' },
-    { id: 'quality-lab', label: 'Quality & Lab', path: '/quality-lab' },
-    { id: 'quality-lab-physical', label: 'Physical Properties', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
-    { id: 'quality-lab-micro', label: 'Microstructure & Hardness', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
-    { id: 'quality-lab-sand', label: 'Sand Properties', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
-    { id: 'quality-lab-chemistry', label: 'Chemistry (Spectro)', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
-    { id: 'quality-lab-mould', label: 'Mould Hardness', path: '/quality-lab', isSubTab: true, parent: 'quality-lab' },
-    { id: 'it-management', label: 'IT Management', path: '/it-management' },
-    { id: 'database-explorer', label: 'Database Explorer', path: '/database-explorer' },
-];
-
+import { AVAILABLE_PAGES } from '../config/constants';
+import './UserManagement.css';
 
 const UserManagement = () => {
     const queryClient = useQueryClient();
@@ -180,17 +153,17 @@ const UserManagement = () => {
 
     const getAccessBadges = (allowedPages) => {
         if (!allowedPages || allowedPages === 'all') {
-            return <span style={{ padding: '0.25rem 0.5rem', backgroundColor: '#DCFCE7', color: '#166534', borderRadius: '0.25rem', fontSize: '0.75rem' }}>Full Access</span>;
+            return <span className="access-badge access-full">Full Access</span>;
         }
         const pages = allowedPages.split(',').filter(p => p);
-        if (pages.length === 0) return <span style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>No access</span>;
+        if (pages.length === 0) return <span className="access-badge access-none">No access</span>;
         if (pages.length > 3) {
-            return <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>{pages.length} pages</span>;
+            return <span className="access-badge access-count">{pages.length} pages</span>;
         }
         return pages.map(p => {
             const page = AVAILABLE_PAGES.find(ap => ap.id === p);
             return page ? (
-                <span key={p} style={{ padding: '0.125rem 0.375rem', backgroundColor: '#DBEAFE', color: '#1E40AF', borderRadius: '0.25rem', fontSize: '0.7rem', marginRight: '0.25rem' }}>
+                <span key={p} className="access-item">
                     {page.label}
                 </span>
             ) : null;
@@ -204,31 +177,31 @@ const UserManagement = () => {
                 <p className="page-subtitle">Manage users and access permissions.</p>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
+            <div className="user-management-grid">
                 {/* User Registration Card */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                <div className="card registration-card">
+                    <h3 className="section-title">
                         👤 Register New User
                     </h3>
 
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#374151' }}>Username</label>
+                        <div className="form-group">
+                            <label className="form-label">Username</label>
                             <input type="text" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} required className="input-field" placeholder="e.g., jdoe" style={{ borderColor: errors.username ? '#EF4444' : undefined }} />
-                            {errors.username && <span style={{ color: '#EF4444', fontSize: '0.75rem' }}>{errors.username}</span>}
+                            {errors.username && <span className="error-text">{errors.username}</span>}
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#374151' }}>Full Name</label>
+                        <div className="form-group">
+                            <label className="form-label">Full Name</label>
                             <input type="text" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} required className="input-field" placeholder="e.g., John Doe" style={{ borderColor: errors.fullName ? '#EF4444' : undefined }} />
-                            {errors.fullName && <span style={{ color: '#EF4444', fontSize: '0.75rem' }}>{errors.fullName}</span>}
+                            {errors.fullName && <span className="error-text">{errors.fullName}</span>}
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#374151' }}>Password</label>
+                        <div className="form-group">
+                            <label className="form-label">Password</label>
                             <input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required className="input-field" placeholder="••••••••" style={{ borderColor: errors.password ? '#EF4444' : undefined }} />
-                            {errors.password && <span style={{ color: '#EF4444', fontSize: '0.75rem' }}>{errors.password}</span>}
+                            {errors.password && <span className="error-text">{errors.password}</span>}
                         </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', color: '#374151' }}>Role</label>
+                        <div className="form-group">
+                            <label className="form-label">Role</label>
                             <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} className="input-field">
                                 <option value="employee">Employee</option>
                                 <option value="admin">Admin</option>
@@ -236,22 +209,18 @@ const UserManagement = () => {
                         </div>
 
                         {formData.role === 'employee' && (
-                            <div style={{ padding: '0.75rem', backgroundColor: '#F9FAFB', borderRadius: '0.375rem', border: '1px solid #E5E7EB' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>🔐 Page Access</span>
+                            <div className="page-access-container">
+                                <div className="page-access-header">
+                                    <span className="page-access-title">🔐 Page Access</span>
                                     <div>
-                                        <button type="button" onClick={() => handleSelectAll(false)} style={{ fontSize: '0.7rem', padding: '0.125rem 0.375rem', marginRight: '0.25rem', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>All</button>
-                                        <button type="button" onClick={() => handleDeselectAll(false)} style={{ fontSize: '0.7rem', padding: '0.125rem 0.375rem', backgroundColor: '#6B7280', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>Clear</button>
+                                        <button type="button" onClick={() => handleSelectAll(false)} className="action-btn-xs btn-primary-xs">All</button>
+                                        <button type="button" onClick={() => handleDeselectAll(false)} className="action-btn-xs btn-secondary-xs">Clear</button>
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                <div className="page-checkbox-grid">
                                     {AVAILABLE_PAGES.filter(page => !page.isSubTab).map(page => (
                                         <React.Fragment key={page.id}>
-                                            <label style={{ 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                gap: '0.25rem', 
-                                                fontSize: '0.75rem', 
+                                            <label className="checkbox-label" style={{ 
                                                 cursor: page.isLocked ? 'not-allowed' : 'pointer',
                                                 opacity: page.isLocked ? 0.7 : 1
                                             }}>
@@ -262,23 +231,16 @@ const UserManagement = () => {
                                                     disabled={page.isLocked}
                                                 />
                                                 {page.label}
-                                                {page.isLocked && <span style={{ fontSize: '0.6rem', color: '#9CA3AF' }}>(required)</span>}
+                                                {page.isLocked && <span className="required-mark">(required)</span>}
                                             </label>
-                                            {/* Show sub-tabs if parent is checked */}
+                                            
+                                            {/* Subtabs - Pattern Master */}
                                             {page.id === 'pattern-master' && formData.allowedPages?.includes('pattern-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#F5F3FF', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #C4B5FD',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#7C3AED', fontWeight: '500', marginBottom: '0.25rem' }}>Pattern Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-purple">
+                                                    <div className="sub-tabs-title text-purple">Pattern Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'pattern-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={formData.allowedPages?.includes(subTab.id)} 
@@ -290,20 +252,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Planning Master */}
                                             {page.id === 'planning-master' && formData.allowedPages?.includes('planning-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#FEF3C7', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #FCD34D',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#D97706', fontWeight: '500', marginBottom: '0.25rem' }}>Planning Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-yellow">
+                                                    <div className="sub-tabs-title text-yellow">Planning Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'planning-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={formData.allowedPages?.includes(subTab.id)} 
@@ -315,20 +271,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Lab Master */}
                                             {page.id === 'lab-master' && formData.allowedPages?.includes('lab-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#ECFDF5', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #A7F3D0',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: '500', marginBottom: '0.25rem' }}>Lab Master Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-green">
+                                                    <div className="sub-tabs-title text-green">Lab Master Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'lab-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={formData.allowedPages?.includes(subTab.id)} 
@@ -340,20 +290,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Quality Lab */}
                                             {page.id === 'quality-lab' && formData.allowedPages?.includes('quality-lab') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#F0F9FF', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #BFDBFE',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#3B82F6', fontWeight: '500', marginBottom: '0.25rem' }}>Department Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-blue">
+                                                    <div className="sub-tabs-title text-blue">Department Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'quality-lab').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={formData.allowedPages?.includes(subTab.id)} 
@@ -378,47 +322,47 @@ const UserManagement = () => {
                 </div>
 
                 {/* Employee List */}
-                <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-                        👥 Registered Users ({users.length})
+                <div className="card registration-card">
+                    <h3 className="section-title">
+                        👤 Registered Users ({users.length})
                     </h3>
 
                     {usersLoading ? (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Loading users...</div>
+                        <div className="loading-text">Loading users...</div>
                     ) : users.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>No users registered yet</div>
+                        <div className="loading-text">No users registered yet</div>
                     ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <div className="users-table-container">
+                            <table className="users-table">
                                 <thead>
-                                    <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Username</th>
-                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Full Name</th>
-                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Role</th>
-                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left', fontWeight: '600' }}>Access</th>
-                                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: '600' }}>Actions</th>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Full Name</th>
+                                        <th>Role</th>
+                                        <th>Access</th>
+                                        <th style={{ textAlign: 'center' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {users.map(user => (
-                                        <tr key={user.Id} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                                            <td style={{ padding: '0.75rem 0.5rem' }}>{user.Username}</td>
-                                            <td style={{ padding: '0.75rem 0.5rem' }}>{user.FullName}</td>
-                                            <td style={{ padding: '0.75rem 0.5rem' }}>
-                                                <span style={{ padding: '0.125rem 0.5rem', backgroundColor: user.Role === 'admin' ? '#FEF3C7' : '#E0E7FF', color: user.Role === 'admin' ? '#92400E' : '#3730A3', borderRadius: '0.25rem', fontSize: '0.75rem', textTransform: 'capitalize' }}>
+                                        <tr key={user.Id}>
+                                            <td>{user.Username}</td>
+                                            <td>{user.FullName}</td>
+                                            <td>
+                                                <span className={`role-badge role-${user.Role}`}>
                                                     {user.Role}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '0.75rem 0.5rem' }}>{getAccessBadges(user.AllowedPages)}</td>
-                                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                                            <td>{getAccessBadges(user.AllowedPages)}</td>
+                                            <td style={{ textAlign: 'center' }}>
                                                 {user.Role !== 'admin' && (
-                                                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                        <button onClick={() => openEditModal(user)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                                                    <div className="action-buttons">
+                                                        <button onClick={() => openEditModal(user)} className="btn-edit">
                                                             Edit
                                                         </button>
                                                         <button 
                                                             onClick={() => setUserToDelete(user)} 
-                                                            style={{ padding: '0.25rem 0.75rem', backgroundColor: '#EF4444', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                            className="btn-delete"
                                                             disabled={deleteMutation.isPending}
                                                         >
                                                             Delete
@@ -437,40 +381,36 @@ const UserManagement = () => {
 
             {/* Edit Modal */}
             {editingUser && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', padding: '1.5rem', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <h3 style={{ marginBottom: '1rem', fontSize: '1.125rem', fontWeight: '600' }}>Edit User: {editingUser.Username}</h3>
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3 className="modal-title">Edit User: {editingUser.Username}</h3>
 
                         <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Username</label>
+                            <div className="form-group">
+                                <label className="form-label">Username</label>
                                 <input type="text" value={editFormData.username} onChange={e => setEditFormData({ ...editFormData, username: e.target.value })} className="input-field" />
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Full Name</label>
+                            <div className="form-group">
+                                <label className="form-label">Full Name</label>
                                 <input type="text" value={editFormData.fullName} onChange={e => setEditFormData({ ...editFormData, fullName: e.target.value })} className="input-field" />
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>New Password (leave blank to keep current)</label>
+                            <div className="form-group">
+                                <label className="form-label">New Password (leave blank to keep current)</label>
                                 <input type="password" value={editFormData.password} onChange={e => setEditFormData({ ...editFormData, password: e.target.value })} className="input-field" placeholder="••••••••" />
                             </div>
 
-                            <div style={{ padding: '0.75rem', backgroundColor: '#F9FAFB', borderRadius: '0.375rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>🔐 Page Access</span>
+                            <div className="page-access-container">
+                                <div className="page-access-header">
+                                    <span className="page-access-title">🔐 Page Access</span>
                                     <div>
-                                        <button type="button" onClick={() => handleSelectAll(true)} style={{ fontSize: '0.7rem', padding: '0.125rem 0.375rem', marginRight: '0.25rem', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>All</button>
-                                        <button type="button" onClick={() => handleDeselectAll(true)} style={{ fontSize: '0.7rem', padding: '0.125rem 0.375rem', backgroundColor: '#6B7280', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }}>Clear</button>
+                                        <button type="button" onClick={() => handleSelectAll(true)} className="action-btn-xs btn-primary-xs">All</button>
+                                        <button type="button" onClick={() => handleDeselectAll(true)} className="action-btn-xs btn-secondary-xs">Clear</button>
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                <div className="page-checkbox-grid">
                                     {AVAILABLE_PAGES.filter(page => !page.isSubTab).map(page => (
                                         <React.Fragment key={page.id}>
-                                            <label style={{ 
-                                                display: 'flex', 
-                                                alignItems: 'center', 
-                                                gap: '0.25rem', 
-                                                fontSize: '0.8rem', 
+                                            <label className="checkbox-label" style={{ 
                                                 cursor: page.isLocked ? 'not-allowed' : 'pointer',
                                                 opacity: page.isLocked ? 0.7 : 1
                                             }}>
@@ -481,23 +421,16 @@ const UserManagement = () => {
                                                     disabled={page.isLocked}
                                                 />
                                                 {page.label}
-                                                {page.isLocked && <span style={{ fontSize: '0.6rem', color: '#9CA3AF' }}>(required)</span>}
+                                                {page.isLocked && <span className="required-mark">(required)</span>}
                                             </label>
-                                            {/* Show sub-tabs if parent is checked */}
+
+                                            {/* Subtabs - Pattern Master */}
                                             {page.id === 'pattern-master' && editFormData.allowedPages?.includes('pattern-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#F5F3FF', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #C4B5FD',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#7C3AED', fontWeight: '500', marginBottom: '0.25rem' }}>Pattern Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-purple">
+                                                    <div className="sub-tabs-title text-purple">Pattern Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'pattern-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={editFormData.allowedPages?.includes(subTab.id)} 
@@ -509,20 +442,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Planning Master */}
                                             {page.id === 'planning-master' && editFormData.allowedPages?.includes('planning-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#FEF3C7', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #FCD34D',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#D97706', fontWeight: '500', marginBottom: '0.25rem' }}>Planning Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-yellow">
+                                                    <div className="sub-tabs-title text-yellow">Planning Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'planning-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={editFormData.allowedPages?.includes(subTab.id)} 
@@ -534,20 +461,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Lab Master */}
                                             {page.id === 'lab-master' && editFormData.allowedPages?.includes('lab-master') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#ECFDF5', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #A7F3D0',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: '500', marginBottom: '0.25rem' }}>Lab Master Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-green">
+                                                    <div className="sub-tabs-title text-green">Lab Master Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'lab-master').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={editFormData.allowedPages?.includes(subTab.id)} 
@@ -559,20 +480,14 @@ const UserManagement = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Subtabs - Quality Lab */}
                                             {page.id === 'quality-lab' && editFormData.allowedPages?.includes('quality-lab') && (
-                                                <div style={{ 
-                                                    gridColumn: '1 / -1', 
-                                                    marginLeft: '1.5rem', 
-                                                    padding: '0.5rem', 
-                                                    backgroundColor: '#F0F9FF', 
-                                                    borderRadius: '0.25rem',
-                                                    border: '1px solid #BFDBFE',
-                                                    marginBottom: '0.25rem'
-                                                }}>
-                                                    <div style={{ fontSize: '0.65rem', color: '#3B82F6', fontWeight: '500', marginBottom: '0.25rem' }}>Department Tabs:</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem' }}>
+                                                <div className="sub-tabs-container sub-tabs-blue">
+                                                    <div className="sub-tabs-title text-blue">Department Tabs:</div>
+                                                    <div className="page-checkbox-grid">
                                                         {AVAILABLE_PAGES.filter(p => p.parent === 'quality-lab').map(subTab => (
-                                                            <label key={subTab.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', cursor: 'pointer' }}>
+                                                            <label key={subTab.id} className="checkbox-label">
                                                                 <input 
                                                                     type="checkbox" 
                                                                     checked={editFormData.allowedPages?.includes(subTab.id)} 
@@ -589,11 +504,11 @@ const UserManagement = () => {
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <div className="modal-actions">
                                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={updateMutation.isPending}>
                                     {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                                 </button>
-                                <button type="button" onClick={() => setEditingUser(null)} style={{ flex: 1, padding: '0.5rem', backgroundColor: '#F3F4F6', border: '1px solid #D1D5DB', borderRadius: '0.375rem', cursor: 'pointer' }}>
+                                <button type="button" onClick={() => setEditingUser(null)} className="btn-cancel">
                                     Cancel
                                 </button>
                             </div>

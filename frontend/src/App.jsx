@@ -21,6 +21,7 @@ const FinanceDashboard = lazy(() => import('./components/FinanceDashboard'));
 const ARAPDashboard = lazy(() => import('./components/ARAPDashboard'));
 const ProductionDashboard = lazy(() => import('./components/ProductionDashboard'));
 const HomePage = lazy(() => import('./components/HomePage'));
+const Marketing = lazy(() => import('./components/Marketing'));
 
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout/Layout';
@@ -127,7 +128,7 @@ const routeConfig = [
   { path: '/finance-dashboard', component: FinanceDashboard, requiredPage: 'finance-dashboard' },
   { path: '/ar-ap-dashboard', component: ARAPDashboard, requiredPage: 'ar-ap-dashboard' },
   { path: '/production-dashboard', component: ProductionDashboard, requiredPage: 'production-dashboard' },
-  { path: '/pattern-master', component: PatternMaster, requiredPage: 'pattern-master' },
+  { path: '/pattern-master', component: PatternMaster, requiredPage: 'pattern-master', passUser: true },
   { path: '/planning-master', component: PlanningMaster, requiredPage: 'planning-master', passUser: true },
   { path: '/lab-master', component: LabMaster, requiredPage: 'lab-master', passUser: true },
   { path: '/melting', component: Melting, requiredPage: 'melting' },
@@ -137,6 +138,7 @@ const routeConfig = [
   { path: '/admin', component: UserManagement, requiredRole: 'admin' },
   { path: '/report-builder', component: ReportBuilder, requiredRole: 'admin' },
   { path: '/report-scheduler', component: ReportScheduler, requiredRole: 'admin' },
+  { path: '/marketing', component: Marketing, requiredPage: 'marketing' },
 ];
 
 const App = () => {

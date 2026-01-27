@@ -19,6 +19,16 @@ import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { format, subMonths } from 'date-fns';
 import api from '../api';
 import ExportButtons from './common/ExportButtons';
+import {
+    applyChartDefaults,
+    CHART_COLORS,
+    getLineChartOptions,
+    getBarChartOptions,
+    getHorizontalBarOptions,
+    getStackedBarOptions,
+    getDoughnutOptions,
+    getMoMGrowthOptions
+} from '../utils/chartConfig';
 import './dashboard/Dashboard.css';
 
 // Register Chart.js components
@@ -36,22 +46,8 @@ ChartJS.register(
     ChartDataLabels
 );
 
-// Disable datalabels globally by default (only enable for Doughnut charts)
-ChartJS.defaults.plugins.datalabels = { display: false };
-
-// Set global darker font colors for all charts
-ChartJS.defaults.color = '#111827'; // Near black for text
-ChartJS.defaults.plugins.legend.labels.color = '#111827';
-ChartJS.defaults.plugins.title.color = '#030712';
-ChartJS.defaults.scale.ticks.color = '#1f2937';
-ChartJS.defaults.scale.title.color = '#1f2937';
-
-// Set global font sizes for better readability
-ChartJS.defaults.font.size = 13;
-ChartJS.defaults.plugins.legend.labels.font = { size: 13 };
-ChartJS.defaults.plugins.title.font = { size: 15, weight: 'bold' };
-ChartJS.defaults.scale.ticks.font = { size: 12 };
-ChartJS.defaults.scale.title.font = { size: 13 };
+// Apply global chart defaults from shared config
+applyChartDefaults(ChartJS);
 
 const REFRESH_INTERVAL = 120000; // 2 minutes - reduces server load while keeping data fresh
 
@@ -670,12 +666,23 @@ const FinanceDashboard = () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'top' },
+            legend: { position: 'bottom' },
             tooltip: {
                 callbacks: {
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: true,
+                align: 'top',
+                anchor: 'end',
+                color: '#1F2937',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value) => formatCurrency(value)
             }
+        },
+        layout: {
+            padding: { top: 15 }
         },
         scales: {
             y: {
@@ -697,7 +704,18 @@ const FinanceDashboard = () => {
                 callbacks: {
                     label: (context) => formatCurrency(context.raw)
                 }
+            },
+            datalabels: {
+                display: true,
+                anchor: 'end',
+                align: 'end',
+                color: '#1F2937',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value) => formatCurrency(value)
             }
+        },
+        layout: {
+            padding: { top: 15, right: 60 }
         },
         scales: {
             x: {
@@ -713,12 +731,23 @@ const FinanceDashboard = () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'top' },
+            legend: { position: 'bottom' },
             tooltip: {
                 callbacks: {
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: true,
+                align: 'top',
+                anchor: 'end',
+                color: '#1F2937',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value) => formatCurrency(value)
             }
+        },
+        layout: {
+            padding: { top: 15 }
         },
         scales: {
             x: { stacked: false },
@@ -763,7 +792,7 @@ const FinanceDashboard = () => {
                 labels: {
                     usePointStyle: true,
                     padding: 15,
-                    font: { size: 11 }
+                    font: { size: 14 }
                 }
             },
             tooltip: {
@@ -775,7 +804,18 @@ const FinanceDashboard = () => {
             },
             filler: {
                 propagate: true
+            },
+            datalabels: {
+                display: true,
+                align: 'top',
+                anchor: 'end',
+                color: '#1F2937',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value) => formatCurrency(value)
             }
+        },
+        layout: {
+            padding: { top: 15 }
         },
         scales: {
             x: {
@@ -866,12 +906,12 @@ const FinanceDashboard = () => {
             datalabels: {
                 display: true,
                 color: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)',
-                anchor: 'end',
-                align: 'top',
-                offset: 4,
+                anchor: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'end' : 'start',
+                align: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'top' : 'bottom',
+                offset: 6,
                 font: {
                     weight: 'bold',
-                    size: 11
+                    size: 13
                 },
                 formatter: (value) => value !== 0 ? `${value > 0 ? '+' : ''}${value}%` : ''
             }
@@ -889,7 +929,8 @@ const FinanceDashboard = () => {
         },
         layout: {
             padding: {
-                top: 20
+                top: 25,
+                bottom: 25
             }
         }
     };
@@ -1127,7 +1168,7 @@ const FinanceDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Monthly Direct vs Indirect Revenue</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : monthlyRevenueByType ? (
@@ -1160,7 +1201,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 Revenue vs Expenses Trend</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : monthlyTrend?.revenueVsExpense ? (
@@ -1188,7 +1229,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🍩 Revenue Composition</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : revenueBreakdown ? (
@@ -1219,7 +1260,7 @@ const FinanceDashboard = () => {
                     <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Monthly Revenue, Purchase & Operating Expenses</h3>
                     <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                 </div>
-                <div style={{ height: '320px' }}>
+                <div style={{ height: '400px' }}>
                     {isLoading ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                     ) : monthlyTrend?.stackedAreaTrend ? (
@@ -1252,7 +1293,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Monthly Expenses Trend</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : monthlyTrend?.expensesTrend ? (
@@ -1280,7 +1321,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Expense Category Ranking</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : expenseBreakdown ? (
@@ -1315,7 +1356,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🍩 Operating vs Direct Costs</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : operatingVsNonOperating ? (
@@ -1343,7 +1384,7 @@ const FinanceDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 MoM Revenue Growth %</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : momRevenueGrowthData ? (

@@ -10,6 +10,7 @@ import { FiLoader, FiPaperclip, FiEye, FiX } from 'react-icons/fi';
 
 const DrawingMasterTab = () => {
     const [formData, setFormData] = useState({
+        No: '',
         Customer: '',
         DrawingNo: '',
         RevNo: '',
@@ -134,6 +135,7 @@ const DrawingMasterTab = () => {
 
     const handleClear = () => {
         setFormData({
+            No: '',
             Customer: '',
             DrawingNo: '',
             RevNo: '',
@@ -186,6 +188,7 @@ const DrawingMasterTab = () => {
         setSelectedId(record.DrawingMasterId);
         setIsEditing(true);
         setFormData({
+            No: record.No || '',
             Customer: record.Customer || '',
             DrawingNo: record.DrawingNo || '',
             RevNo: record.RevNo || '',
@@ -306,6 +309,22 @@ const DrawingMasterTab = () => {
                         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
                         gap: '1rem' 
                     }}>
+                        {/* Serial No */}
+                        <div className="form-group">
+                            <label htmlFor="No" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
+                                Serial No
+                            </label>
+                            <input
+                                type="text"
+                                id="No"
+                                name="No"
+                                value={formData.No}
+                                onChange={handleChange}
+                                className="input-field"
+                                placeholder="Enter No"
+                            />
+                        </div>
+
                         {/* Customer */}
                         <div className="form-group">
                             <label htmlFor="Customer" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
@@ -633,7 +652,7 @@ const DrawingMasterTab = () => {
                                 zIndex: 10
                             }}>
                                 <tr>
-                                    {['ID', 'Customer', 'Drawing No', 'Rev No', 'Description', 'Customer Grade', 'AKP Grade', 'Remarks', 'Comments', 'Attachment'].map(header => (
+                                    {['Customer', 'Drawing Serial No', 'Drawing No', 'Rev No', 'Description', 'Customer Grade', 'AKP Grade', 'Remarks', 'Comments', 'Attachment'].map(header => (
                                         <th key={header} style={{
                                             padding: '0.75rem 1rem',
                                             fontWeight: '600',
@@ -650,7 +669,18 @@ const DrawingMasterTab = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {Array.isArray(records) && records.map((record) => (
+                                {Array.isArray(records) && [...records].sort((a, b) => {
+                                    // First sort by Customer name (alphabetically)
+                                    const customerCompare = (a.Customer || '').localeCompare(b.Customer || '');
+                                    if (customerCompare !== 0) return customerCompare;
+                                    // Same Customer, sort by Serial No (ascending)
+                                    const noA = a.No ? parseInt(a.No, 10) : 0;
+                                    const noB = b.No ? parseInt(b.No, 10) : 0;
+                                    if (isNaN(noA) && isNaN(noB)) return 0;
+                                    if (isNaN(noA)) return 1;
+                                    if (isNaN(noB)) return -1;
+                                    return noA - noB;
+                                }).map((record, index) => (
                                     <tr 
                                         key={record.DrawingMasterId}
                                         onClick={() => handleRowClick(record)}
@@ -660,8 +690,8 @@ const DrawingMasterTab = () => {
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.DrawingMasterId}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={record.Customer} maxLength={30} /></td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.No || '-'}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.DrawingNo}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.RevNo}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={record.Description} maxLength={35} /></td>

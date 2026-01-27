@@ -2,6 +2,8 @@
 // Uses CSS custom properties from tokens.css for consistency
 // This file consolidates duplicate styles from quality-lab, it-management, pattern-master, and lab-master
 
+import { format, parseISO, isValid } from 'date-fns';
+
 // ============================================
 // LABEL & INPUT BASE STYLES
 // ============================================
@@ -215,25 +217,58 @@ export const textColors = {
 
 // ============================================
 // DATE UTILITY FUNCTIONS
+// Uses date-fns for locale-independent parsing
 // ============================================
 
+/**
+ * Format a date for display as dd/MM/yyyy
+ * Handles: Date objects, ISO strings, and YYYY-MM-DD strings
+ * @param {Date|string} dateString - The date to format
+ * @returns {string} Formatted date string (dd/MM/yyyy) or empty string
+ */
 export const formatDate = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    
+    let date;
+    if (dateString instanceof Date) {
+        date = dateString;
+    } else if (typeof dateString === 'string') {
+        // parseISO handles ISO 8601 format (from backend JSON)
+        // e.g., "2026-01-15T00:00:00.000Z" or "2026-01-15"
+        date = parseISO(dateString);
+    }
+    
+    if (!date || !isValid(date)) return '';
+    return format(date, 'dd/MM/yyyy');
 };
 
+/**
+ * Format a date for HTML date input (YYYY-MM-DD)
+ * @param {Date|string} dateString - The date to format
+ * @returns {string} Formatted date string (yyyy-MM-dd) or empty string
+ */
 export const formatDateForInput = (dateString) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    
+    let date;
+    if (dateString instanceof Date) {
+        date = dateString;
+    } else if (typeof dateString === 'string') {
+        date = parseISO(dateString);
+    }
+    
+    if (!date || !isValid(date)) return '';
+    return format(date, 'yyyy-MM-dd');
 };
 
-// Get yesterday's date in YYYY-MM-DD format for date input defaults
+/**
+ * Get yesterday's date in YYYY-MM-DD format for date input defaults
+ * @returns {string} Yesterday's date in yyyy-MM-dd format
+ */
 export const getYesterdayDate = () => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    return `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    return format(yesterday, 'yyyy-MM-dd');
 };
 

@@ -15,6 +15,7 @@ import NumberInput from './common/NumberInput';
 import PlanningEntry from './PlanningEntry';
 import SleeveRequirement from './SleeveRequirement';
 import SleeveIndent from './SleeveIndent';
+import { formatDate, formatDateForInput } from '../styles/sharedStyles';
 
 const PlanningMaster = ({ user }) => {
     // All available tabs with their permission pageId
@@ -37,9 +38,9 @@ const PlanningMaster = ({ user }) => {
         // If user has 'all' access, show all tabs
         if (allowedPages.includes('all')) return allTabs;
         
-        // If no specific sub-tabs are assigned, show all tabs (backward compatibility)
+        // If no specific sub-tabs are assigned, show no tabs (user has parent access but no sub-tab access)
         const hasAnySubTab = allTabs.some(tab => allowedPages.includes(tab.pageId));
-        if (!hasAnySubTab) return allTabs;
+        if (!hasAnySubTab) return [];
         
         // Filter to only allowed tabs
         return allTabs.filter(tab => allowedPages.includes(tab.pageId));
@@ -82,12 +83,6 @@ const PlanningMaster = ({ user }) => {
     // Dropdown data
     const [customers, setCustomers] = useState([]);
     const [rawMaterials, setRawMaterials] = useState([]);
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-    };
 
     useEffect(() => {
         fetchCustomers();
@@ -186,12 +181,6 @@ const PlanningMaster = ({ user }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const formatDateForInput = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     };
 
     const handleAdd = () => {
@@ -438,7 +427,7 @@ const PlanningMaster = ({ user }) => {
                                 zIndex: 10
                             }}>
                                 <tr>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>ID</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Sr. No</th>
                                     <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Item Code</th>
                                     <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Customer Name</th>
                                     <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Qty</th>
@@ -446,7 +435,7 @@ const PlanningMaster = ({ user }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {schedules.map((schedule) => (
+                                {schedules.map((schedule, index) => (
                                     <tr 
                                         key={schedule.ID} 
                                         onClick={() => handleRowClick(schedule)}
@@ -456,7 +445,7 @@ const PlanningMaster = ({ user }) => {
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{schedule.ID}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{index + 1}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.ItemCode} maxLength={20} /></td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.CustomerName} maxLength={25} /></td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'right' }}>{schedule.ScheduleQty}</td>

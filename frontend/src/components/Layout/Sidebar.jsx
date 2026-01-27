@@ -36,6 +36,7 @@ const NAV_ITEMS = [
     { path: '/quality-lab', pageId: 'quality-lab', label: 'Quality & Lab', icon: FiClipboard },
     { path: '/it-management', pageId: 'it-management', label: 'IT Management', icon: FiMonitor },
     { path: '/database-explorer', pageId: 'database-explorer', label: 'Database Explorer', icon: FiDatabase },
+    { path: '/marketing', pageId: 'marketing', label: 'Marketing', icon: FiPlusSquare },
 ];
 
 const Sidebar = ({ user, onLogout, isOpen, onClose }) => {
@@ -350,7 +351,9 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }) => {
                     padding: isCollapsed ? '1rem 0.5rem' : '1rem', 
                     borderTop: '1px solid #E5E7EB',
                     display: 'flex',
-                    justifyContent: isCollapsed ? 'center' : 'flex-start'
+                    flexDirection: 'column',
+                    alignItems: isCollapsed ? 'center' : 'stretch',
+                    gap: '0.5rem'
                 }}>
                     <button onClick={handleLogout} 
                         style={{
@@ -372,6 +375,10 @@ const Sidebar = ({ user, onLogout, isOpen, onClose }) => {
                         <FiLogOut size={20} />
                         {!isCollapsed && <span>Logout</span>}
                     </button>
+
+                    {!isCollapsed && (
+                        <div style={{textAlign: 'center', fontSize: '0.7rem', color: '#9CA3AF', marginTop: '0.25rem'}}>v1.0.0</div>
+                    )}
                 </div>
             </aside>
         </>

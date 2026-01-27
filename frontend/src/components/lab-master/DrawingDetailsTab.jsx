@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../api';
 import Combobox from '../common/Combobox';
 import TableSkeleton from '../common/TableSkeleton';
+import { FiPaperclip, FiExternalLink } from 'react-icons/fi';
 
 const DrawingDetailsTab = () => {
     const [selectedDrawingNo, setSelectedDrawingNo] = useState('');
@@ -103,31 +104,79 @@ const DrawingDetailsTab = () => {
                                             fontSize: '0.875rem'
                                         }}>
                                             <tbody>
-                                                {/* Row 1 */}
+                                                {/* Row 1 - Serial No & Customer */}
                                                 <tr>
+                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', width: '20%' }}>Serial No</td>
+                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', width: '30%' }}>{record.No || '-'}</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', width: '20%' }}>Customer</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', width: '30%' }}>{record.Customer || '-'}</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB', width: '20%' }}>Rev No</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', width: '30%' }}>{record.RevNo || '-'}</td>
                                                 </tr>
-                                                {/* Row 2 */}
+                                                {/* Row 2 - Rev No & Description */}
                                                 <tr>
+                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>Rev No</td>
+                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: 'white' }}>{record.RevNo || '-'}</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>Description</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: 'white' }}>{record.Description || '-'}</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>Customer Grade</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: 'white' }}>{record.CustomerGrade || '-'}</td>
                                                 </tr>
-                                                {/* Row 3 */}
+                                                {/* Row 3 - Customer Grade & AKP Grade */}
                                                 <tr>
+                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Customer Grade</td>
+                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>{record.CustomerGrade || '-'}</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>AKP Grade</td>
                                                     <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>{record.AKPGrade || '-'}</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>Remarks</td>
-                                                    <td style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>{record.Remarks || '-'}</td>
+                                                </tr>
+                                                {/* Row 4 - Remarks */}
+                                                <tr>
+                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>Remarks</td>
+                                                    <td colSpan="3" style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: 'white' }}>{record.Remarks || '-'}</td>
                                                 </tr>
                                                 {/* Row 4 - Comments (full width) */}
                                                 <tr>
                                                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>Comments</td>
                                                     <td colSpan="3" style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: 'white' }}>{record.Comments || '-'}</td>
+                                                </tr>
+                                                {/* Row 5 - Attachment */}
+                                                <tr>
+                                                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: '500', color: '#374151', backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <FiPaperclip /> Attachment
+                                                        </span>
+                                                    </td>
+                                                    <td colSpan="3" style={{ padding: '0.5rem 0.75rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                                        {record.AttachmentName ? (
+                                                            <a 
+                                                                href={`${api.defaults.baseURL}/drawing-master/attachment/${record.DrawingMasterId}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '0.5rem',
+                                                                    color: '#2563EB',
+                                                                    textDecoration: 'none',
+                                                                    fontWeight: '500',
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    borderRadius: '4px',
+                                                                    backgroundColor: '#EFF6FF',
+                                                                    border: '1px solid #BFDBFE',
+                                                                    transition: 'all 0.2s ease'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.target.style.backgroundColor = '#DBEAFE';
+                                                                    e.target.style.borderColor = '#93C5FD';
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.target.style.backgroundColor = '#EFF6FF';
+                                                                    e.target.style.borderColor = '#BFDBFE';
+                                                                }}
+                                                            >
+                                                                <FiExternalLink size={14} />
+                                                                {record.AttachmentName}
+                                                            </a>
+                                                        ) : (
+                                                            <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>No attachment</span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             </tbody>
                                         </table>

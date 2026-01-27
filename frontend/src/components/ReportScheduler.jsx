@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
 import { FiCalendar, FiClock, FiPlay, FiPause, FiTrash2, FiPlus, FiX, FiRefreshCw } from 'react-icons/fi';
+import { format, parseISO, isValid } from 'date-fns';
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -134,12 +135,12 @@ const ReportScheduler = () => {
         }
     };
 
+    // Format datetime for display using date-fns (locale-independent)
     const formatDate = (dateStr) => {
         if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleString('en-IN', { 
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
+        const date = parseISO(dateStr);
+        if (!isValid(date)) return '-';
+        return format(date, 'dd MMM yyyy, HH:mm');
     };
 
     return (

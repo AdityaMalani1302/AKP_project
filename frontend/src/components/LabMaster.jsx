@@ -49,14 +49,8 @@ const LabMaster = ({ user }) => {
         );
         
         if (!hasSpecificSubTabs) {
-             // If no specific sub-tabs (like drawing-master) are assigned, 
-             // but user has 'lab-master' (which they must to get here),
-             // decide default behavior. 
-             // Option A: Show everything (legacy friendly)
-             // Option B: Show only main Lab Master tab.
-             
-             // Based on PlanningMaster logic, we show all if no specific sub-tabs are present.
-             return allTabs;
+             // If no specific sub-tabs are assigned, only show the main Lab Master tab
+             return allTabs.filter(tab => tab.pageId === 'lab-master');
         }
 
         // Return only allowed tabs. 
@@ -529,7 +523,7 @@ const LabMaster = ({ user }) => {
                                 zIndex: 10
                             }}>
                                 <tr>
-                                    {['ID', 'Customer', 'Drg No', 'Description', 'Grade', 'Part Weight', 'Min/Max Thickness', 'Thickness Group', 'Base C', 'Base Si', 'C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Cu', 'Mg', 'CE', 'Nickel', 'Moly', 'CRCA', 'RR', 'PIG', 'MS', 'Mg Mix', 'Regular/Critical', 'Last Box Temp', 'Remarks'].map(header => (
+                                    {['Sr. No', 'Customer', 'Drg No', 'Description', 'Grade', 'Part Weight', 'Min/Max Thickness', 'Thickness Group', 'Base C', 'Base Si', 'C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Cu', 'Mg', 'CE', 'Nickel', 'Moly', 'CRCA', 'RR', 'PIG', 'MS', 'Mg Mix', 'Regular/Critical', 'Last Box Temp', 'Remarks'].map((header, idx) => (
                                         <th key={header} style={{
                                             padding: '0.75rem 1rem',
                                             fontWeight: '600',
@@ -546,7 +540,7 @@ const LabMaster = ({ user }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {records.map((record) => (
+                                {records.map((record, index) => (
                                     <tr 
                                         key={record.LabMasterId} 
                                         onClick={() => handleRowClick(record)}
@@ -556,7 +550,7 @@ const LabMaster = ({ user }) => {
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.LabMasterId}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{index + 1}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={record.Customer} maxLength={30} /></td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}>{record.DrgNo}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={record.Description} maxLength={35} /></td>

@@ -1,0 +1,554 @@
+/**
+ * Lab Master Controller
+ * Handles all business logic for Lab Master operations.
+ */
+
+const { sql } = require('../config/db');
+const logger = require('../utils/logger');
+
+/**
+ * Retrieves all lab master records with optional search filtering.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.getAllLabRecords = async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = `
+            SELECT 
+                LabMasterId,
+                Customer, DrgNo, Description, Grade, PartWeight,
+                MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
+                C, Si, Mn, P, S,
+                Cr, Cu, Mg_Chem, CE, Nickel, Moly,
+                CRCA, RR, PIG, MS, Mg_Mix,
+                RegularCritical, LastBoxTemp, Remarks,
+                CreatedAt, UpdatedAt
+            FROM LabMaster
+        `;
+
+        const request = req.db.request();
+        if (search) {
+            request.input('search', sql.NVarChar, `%${search}%`);
+            query += ` WHERE 
+                Customer LIKE @search OR 
+                DrgNo LIKE @search OR 
+                Grade LIKE @search OR
+                Description LIKE @search
+            `;
+        }
+
+        query += ' ORDER BY LabMasterId ASC';
+
+        const result = await request.query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        logger.error('Error fetching lab master records:', err);
+        res.status(500).json({ error: 'Failed to fetch lab master records' });
+    }
+};
+
+/**
+ * Retrieves a single lab master record by ID.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.getLabRecordById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const request = new sql.Request(req.db);
+        request.input('id', sql.Int, parseInt(id));
+
+        const result = await request.query`
+            SELECT * FROM LabMaster WHERE LabMasterId = @id
+        `;
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Lab master record not found' });
+        }
+
+        res.json(result.recordset[0]);
+    } catch (err) {
+        logger.error('Error fetching lab master record:', err);
+        res.status(500).json({ error: 'Failed to fetch lab master record' });
+    }
+};
+
+/**
+ * Creates a new lab master record.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.createLabRecord = async (req, res) => {
+    const {
+        // Details
+        Customer, DrgNo, Description, Grade, PartWeight,
+        MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
+        // Final Chemistry
+        C, Si, Mn, P, S,
+        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
+        // Charge Mix
+        CRCA, RR, PIG, MS, Mg_Mix,
+        // Others
+        RegularCritical, LastBoxTemp, Remarks
+    } = req.body;
+
+    try {
+        // Check for duplicate DrgNo before inserting
+        // Normalize by removing hyphens/dashes so "104-9409" and "1049409" are treated as same
+        if (DrgNo && DrgNo.trim() !== '') {
+            const normalizedDrgNo = DrgNo.replace(/[-\s]/g, ''); // Remove hyphens and spaces
+            const checkRequest = new sql.Request(req.db);
+            checkRequest.input('NormalizedDrgNo', sql.NVarChar(100), normalizedDrgNo);
+            const existingCheck = await checkRequest.query`
+                SELECT LabMasterId, DrgNo FROM LabMaster 
+                WHERE REPLACE(REPLACE(DrgNo, '-', ''), ' ', '') = @NormalizedDrgNo
+            `;
+            if (existingCheck.recordset.length > 0) {
+                const existingDrgNo = existingCheck.recordset[0].DrgNo;
+                return res.status(400).json({ 
+                    error: `Drawing No "${DrgNo}" already exists (matches existing "${existingDrgNo}"). Each entry must have a unique Drawing No.` 
+                });
+            }
+        }
+
+        const request = new sql.Request(req.db);
+
+        // Details inputs
+        request.input('Customer', sql.NVarChar(255), Customer || null);
+        request.input('DrgNo', sql.NVarChar(100), DrgNo || null);
+        request.input('Description', sql.NVarChar(500), Description || null);
+        request.input('Grade', sql.NVarChar(100), Grade || null);
+        request.input('PartWeight', sql.NVarChar(100), PartWeight || null);
+        request.input('MinMaxThickness', sql.NVarChar(100), MinMaxThickness || null);
+        request.input('ThicknessGroup', sql.NVarChar(100), ThicknessGroup || null);
+        request.input('BaseChe_C', sql.NVarChar(50), BaseChe_C || null);
+        request.input('BaseChe_Si', sql.NVarChar(50), BaseChe_Si || null);
+
+        // Final Chemistry inputs
+        request.input('C', sql.NVarChar(50), C || null);
+        request.input('Si', sql.NVarChar(50), Si || null);
+        request.input('Mn', sql.NVarChar(50), Mn || null);
+        request.input('P', sql.NVarChar(50), P || null);
+        request.input('S', sql.NVarChar(50), S || null);
+        request.input('Cr', sql.NVarChar(50), Cr || null);
+        request.input('Cu', sql.NVarChar(50), Cu || null);
+        request.input('Mg_Chem', sql.NVarChar(50), Mg_Chem || null);
+        request.input('CE', sql.NVarChar(50), CE || null);
+        request.input('Nickel', sql.NVarChar(50), Nickel || null);
+        request.input('Moly', sql.NVarChar(50), Moly || null);
+
+        // Charge Mix inputs
+        request.input('CRCA', sql.NVarChar(100), CRCA || null);
+        request.input('RR', sql.NVarChar(100), RR || null);
+        request.input('PIG', sql.NVarChar(100), PIG || null);
+        request.input('MS', sql.NVarChar(100), MS || null);
+        request.input('Mg_Mix', sql.NVarChar(100), Mg_Mix || null);
+
+        // Others inputs
+        request.input('RegularCritical', sql.NVarChar(50), RegularCritical || null);
+        request.input('LastBoxTemp', sql.NVarChar(100), LastBoxTemp || null);
+        request.input('Remarks', sql.NVarChar(2000), Remarks || null);
+
+        const result = await request.query`
+            INSERT INTO LabMaster (
+                Customer, DrgNo, Description, Grade, PartWeight,
+                MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
+                C, Si, Mn, P, S,
+                Cr, Cu, Mg_Chem, CE, Nickel, Moly,
+                CRCA, RR, PIG, MS, Mg_Mix,
+                RegularCritical, LastBoxTemp, Remarks
+            )
+            OUTPUT INSERTED.LabMasterId
+            VALUES (
+                @Customer, @DrgNo, @Description, @Grade, @PartWeight,
+                @MinMaxThickness, @ThicknessGroup, @BaseChe_C, @BaseChe_Si,
+                @C, @Si, @Mn, @P, @S,
+                @Cr, @Cu, @Mg_Chem, @CE, @Nickel, @Moly,
+                @CRCA, @RR, @PIG, @MS, @Mg_Mix,
+                @RegularCritical, @LastBoxTemp, @Remarks
+            )
+        `;
+
+        const newId = result.recordset[0].LabMasterId;
+        logger.info(`Lab master record created: ID ${newId}`);
+        res.json({
+            success: true,
+            message: 'Lab master record added successfully',
+            id: newId
+        });
+    } catch (err) {
+        logger.error('Error adding lab master record:', err);
+        res.status(500).json({ error: 'Failed to add lab master record' });
+    }
+};
+
+/**
+ * Updates an existing lab master record.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.updateLabRecord = async (req, res) => {
+    const { id } = req.params;
+    const {
+        Customer, DrgNo, Description, Grade, PartWeight,
+        MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
+        C, Si, Mn, P, S,
+        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
+        CRCA, RR, PIG, MS, Mg_Mix,
+        RegularCritical, LastBoxTemp, Remarks
+    } = req.body;
+
+    try {
+        const request = new sql.Request(req.db);
+        request.input('id', sql.Int, parseInt(id));
+
+        // Details inputs
+        request.input('Customer', sql.NVarChar(255), Customer || null);
+        request.input('DrgNo', sql.NVarChar(100), DrgNo || null);
+        request.input('Description', sql.NVarChar(500), Description || null);
+        request.input('Grade', sql.NVarChar(100), Grade || null);
+        request.input('PartWeight', sql.NVarChar(100), PartWeight || null);
+        request.input('MinMaxThickness', sql.NVarChar(100), MinMaxThickness || null);
+        request.input('ThicknessGroup', sql.NVarChar(100), ThicknessGroup || null);
+        request.input('BaseChe_C', sql.NVarChar(50), BaseChe_C || null);
+        request.input('BaseChe_Si', sql.NVarChar(50), BaseChe_Si || null);
+
+        // Final Chemistry inputs
+        request.input('C', sql.NVarChar(50), C || null);
+        request.input('Si', sql.NVarChar(50), Si || null);
+        request.input('Mn', sql.NVarChar(50), Mn || null);
+        request.input('P', sql.NVarChar(50), P || null);
+        request.input('S', sql.NVarChar(50), S || null);
+        request.input('Cr', sql.NVarChar(50), Cr || null);
+        request.input('Cu', sql.NVarChar(50), Cu || null);
+        request.input('Mg_Chem', sql.NVarChar(50), Mg_Chem || null);
+        request.input('CE', sql.NVarChar(50), CE || null);
+        request.input('Nickel', sql.NVarChar(50), Nickel || null);
+        request.input('Moly', sql.NVarChar(50), Moly || null);
+
+        // Charge Mix inputs
+        request.input('CRCA', sql.NVarChar(100), CRCA || null);
+        request.input('RR', sql.NVarChar(100), RR || null);
+        request.input('PIG', sql.NVarChar(100), PIG || null);
+        request.input('MS', sql.NVarChar(100), MS || null);
+        request.input('Mg_Mix', sql.NVarChar(100), Mg_Mix || null);
+
+        // Others inputs
+        request.input('RegularCritical', sql.NVarChar(50), RegularCritical || null);
+        request.input('LastBoxTemp', sql.NVarChar(100), LastBoxTemp || null);
+        request.input('Remarks', sql.NVarChar(2000), Remarks || null);
+
+
+        const result = await request.query`
+            UPDATE LabMaster
+            SET Customer = @Customer,
+                DrgNo = @DrgNo,
+                Description = @Description,
+                Grade = @Grade,
+                PartWeight = @PartWeight,
+                MinMaxThickness = @MinMaxThickness,
+                ThicknessGroup = @ThicknessGroup,
+                BaseChe_C = @BaseChe_C,
+                BaseChe_Si = @BaseChe_Si,
+                C = @C,
+                Si = @Si,
+                Mn = @Mn,
+                P = @P,
+                S = @S,
+                Cr = @Cr,
+                Cu = @Cu,
+                Mg_Chem = @Mg_Chem,
+                CE = @CE,
+                Nickel = @Nickel,
+                Moly = @Moly,
+                CRCA = @CRCA,
+                RR = @RR,
+                PIG = @PIG,
+                MS = @MS,
+                Mg_Mix = @Mg_Mix,
+                RegularCritical = @RegularCritical,
+                LastBoxTemp = @LastBoxTemp,
+                Remarks = @Remarks,
+                UpdatedAt = SYSDATETIME()
+            WHERE LabMasterId = @id
+        `;
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'Lab master record not found' });
+        }
+
+        logger.info(`Lab master record updated: ID ${id}`);
+        res.json({ success: true, message: 'Lab master record updated successfully' });
+    } catch (err) {
+        logger.error('Error updating lab master record:', err);
+        res.status(500).json({ error: 'Failed to update lab master record' });
+    }
+};
+
+/**
+ * Deletes a lab master record by ID.
+ * @param {import('express').Request} req - Express request object.
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.deleteLabRecord = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const request = new sql.Request(req.db);
+        request.input('id', sql.Int, parseInt(id));
+
+        const result = await request.query`
+            DELETE FROM LabMaster WHERE LabMasterId = @id
+        `;
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ error: 'Lab master record not found' });
+        }
+
+        logger.info(`Lab master record deleted: ID ${id}`);
+        res.json({ success: true, message: 'Lab master record deleted successfully' });
+    } catch (err) {
+        logger.error('Error deleting lab master record:', err);
+        res.status(500).json({ error: 'Failed to delete lab master record' });
+    }
+};
+
+/**
+ * Imports lab master records from an Excel file.
+ * @param {import('express').Request} req - Express request object (with file in req.file).
+ * @param {import('express').Response} res - Express response object.
+ * @returns {Promise<void>}
+ */
+exports.importExcel = async (req, res) => {
+    const ExcelJS = require('exceljs');
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        // Parse the Excel file from buffer using ExcelJS
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet || worksheet.rowCount < 2) {
+            return res.status(400).json({ error: 'Excel file is empty or has no data rows' });
+        }
+
+        // Get headers from second row (since first row has grouped headers)
+        const headerRow = worksheet.getRow(2);
+        const headers = {};
+        headerRow.eachCell((cell, colNumber) => {
+            // Clean the header value (remove extra spaces, handle newlines)
+            let value = cell.value ? String(cell.value).trim() : '';
+            // Basic cleanup to match variations
+            value = value.replace(/\s+/g, ' ');
+            headers[colNumber] = value;
+        });
+
+        logger.info(`[Lab Import] Detected Headers: ${JSON.stringify(headers)}`);
+
+        let successCount = 0;
+        let errorCount = 0;
+        let skippedCount = 0;
+        const errors = [];
+        const skippedRows = [];
+
+        // Column name mapping (Excel header -> Database field)
+        const columnMap = {
+            'No': null, // Skip ID column if present
+            'Customer': 'Customer',
+            'Drg. No': 'DrgNo',
+            'Drg No': 'DrgNo',
+            'Description': 'Description',
+            'Grade': 'Grade',
+            'Part Weight': 'PartWeight',
+            'Min-Max Thickness': 'MinMaxThickness',
+            'Thickness Group': 'ThicknessGroup',
+            // Base Chemistry - Handle variations in spacing
+            'BASE CHEMISTRY C %': 'BaseChe_C',
+            'BASE CHEMISTRY Si %': 'BaseChe_Si',
+            'BASE CHEMISTRY C%': 'BaseChe_C',
+            'BASE CHEMISTRY Si%': 'BaseChe_Si',
+            // Final Control Chemistry
+            'C %': 'C',
+            'Si %': 'Si',
+            'Mn %': 'Mn',
+            'P %': 'P',
+            'S %': 'S',
+            'Cr %': 'Cr',
+            'Cu %': 'Cu',
+            'Mg %': 'Mg_Chem', // Critical: Mg % -> Mg_Chem
+            'CE %': 'CE',
+            'Nickel %': 'Nickel',
+            'Moly %': 'Moly',
+            // Charge Mix - Kgs
+            'CRCA': 'CRCA',
+            'RR': 'RR',
+            'PIG': 'PIG',
+            'MS': 'MS',
+            'Mg': 'Mg_Mix',    // Critical: Plain Mg -> Mg_Mix
+            // Others
+            'Regular / Critical': 'RegularCritical',
+            'Last Box Temp': 'LastBoxTemp',
+            'Remarks': 'Remarks'
+        };
+
+        // Build column index to db field mapping
+        const columnIndexToField = {};
+
+        // FIRST: Hardcode Base Chemistry columns by position (columns 9 and 10)
+        // since they have the same names as Final Chemistry but are in Row 1 merged cell
+        columnIndexToField['9'] = 'BaseChe_C';
+        columnIndexToField['10'] = 'BaseChe_Si';
+
+        for (const [colNumber, header] of Object.entries(headers)) {
+            // Skip columns 9 and 10 - already mapped to Base Chemistry
+            if (colNumber === '9' || colNumber === '10') continue;
+
+            // Try direct match
+            let dbField = columnMap[header];
+
+            if (dbField) {
+                columnIndexToField[colNumber] = dbField;
+            }
+        }
+
+        // Helper function to get cell value as string
+        const getCellValue = (cell) => {
+            if (!cell || cell.value === null || cell.value === undefined) return null;
+            // Handle rich text
+            if (typeof cell.value === 'object' && cell.value.richText) {
+                return cell.value.richText.map(r => r.text).join('');
+            }
+            return String(cell.value);
+        };
+
+        // Helper function to get mapped value from row
+        const getMappedValue = (row, dbField) => {
+            for (const [colNumber, field] of Object.entries(columnIndexToField)) {
+                if (field === dbField) {
+                    return getCellValue(row.getCell(parseInt(colNumber)));
+                }
+            }
+            return null;
+        };
+
+        // Process each row (starting from row 3, skipping 2 header rows)
+        for (let rowNumber = 3; rowNumber <= worksheet.rowCount; rowNumber++) {
+            const row = worksheet.getRow(rowNumber);
+            // Skip empty rows
+            if (row.cellCount === 0) continue;
+            try {
+                // Get key fields for duplicate check
+                const drgNo = getMappedValue(row, 'DrgNo');
+                const customer = getMappedValue(row, 'Customer');
+                const grade = getMappedValue(row, 'Grade');
+
+                // Skip rows with no DrgNo (required field)
+                if (!drgNo || drgNo.trim() === '') {
+                    skippedCount++;
+                    skippedRows.push(`Row ${rowNumber}: Missing DrgNo`);
+                    continue;
+                }
+
+                // Check for duplicate - normalize DrgNo by removing hyphens/spaces
+                const normalizedDrgNo = drgNo.replace(/[-\s]/g, '');
+                const checkRequest = new sql.Request(req.db);
+                checkRequest.input('NormalizedDrgNo', sql.NVarChar(100), normalizedDrgNo);
+                checkRequest.input('Customer', sql.NVarChar(255), customer || '');
+                checkRequest.input('Grade', sql.NVarChar(100), grade || '');
+
+                const existingCheck = await checkRequest.query`
+                    SELECT LabMasterId FROM LabMaster 
+                    WHERE REPLACE(REPLACE(DrgNo, '-', ''), ' ', '') = @NormalizedDrgNo 
+                    AND Customer = @Customer AND Grade = @Grade
+                `;
+
+                if (existingCheck.recordset.length > 0) {
+                    // Duplicate found - skip this row
+                    skippedCount++;
+                    skippedRows.push(`Row ${rowNumber}: Duplicate (DrgNo: ${drgNo})`);
+                    continue;
+                }
+
+                const request = new sql.Request(req.db);
+
+                // Map Excel columns to database fields
+                request.input('Customer', sql.NVarChar(255), customer);
+                request.input('DrgNo', sql.NVarChar(100), drgNo);
+                request.input('Description', sql.NVarChar(500), getMappedValue(row, 'Description'));
+                request.input('Grade', sql.NVarChar(100), grade);
+                request.input('PartWeight', sql.NVarChar(100), getMappedValue(row, 'PartWeight'));
+                request.input('MinMaxThickness', sql.NVarChar(100), getMappedValue(row, 'MinMaxThickness'));
+                request.input('ThicknessGroup', sql.NVarChar(100), getMappedValue(row, 'ThicknessGroup'));
+                request.input('BaseChe_C', sql.NVarChar(50), getMappedValue(row, 'BaseChe_C'));
+                request.input('BaseChe_Si', sql.NVarChar(50), getMappedValue(row, 'BaseChe_Si'));
+                request.input('C', sql.NVarChar(50), getMappedValue(row, 'C'));
+                request.input('Si', sql.NVarChar(50), getMappedValue(row, 'Si'));
+                request.input('Mn', sql.NVarChar(50), getMappedValue(row, 'Mn'));
+                request.input('P', sql.NVarChar(50), getMappedValue(row, 'P'));
+                request.input('S', sql.NVarChar(50), getMappedValue(row, 'S'));
+                request.input('Cr', sql.NVarChar(50), getMappedValue(row, 'Cr'));
+                request.input('Cu', sql.NVarChar(50), getMappedValue(row, 'Cu'));
+                request.input('Mg_Chem', sql.NVarChar(50), getMappedValue(row, 'Mg_Chem'));
+                request.input('CE', sql.NVarChar(50), getMappedValue(row, 'CE'));
+                request.input('Nickel', sql.NVarChar(50), getMappedValue(row, 'Nickel'));
+                request.input('Moly', sql.NVarChar(50), getMappedValue(row, 'Moly'));
+                request.input('CRCA', sql.NVarChar(100), getMappedValue(row, 'CRCA'));
+                request.input('RR', sql.NVarChar(100), getMappedValue(row, 'RR'));
+                request.input('PIG', sql.NVarChar(100), getMappedValue(row, 'PIG'));
+                request.input('MS', sql.NVarChar(100), getMappedValue(row, 'MS'));
+                request.input('Mg_Mix', sql.NVarChar(100), getMappedValue(row, 'Mg_Mix'));
+                request.input('RegularCritical', sql.NVarChar(50), getMappedValue(row, 'RegularCritical'));
+                request.input('LastBoxTemp', sql.NVarChar(100), getMappedValue(row, 'LastBoxTemp'));
+                request.input('Remarks', sql.NVarChar(2000), getMappedValue(row, 'Remarks'));
+
+                await request.query`
+                    INSERT INTO LabMaster (
+                        Customer, DrgNo, Description, Grade, PartWeight,
+                        MinMaxThickness, ThicknessGroup, BaseChe_C, BaseChe_Si,
+                        C, Si, Mn, P, S,
+                        Cr, Cu, Mg_Chem, CE, Nickel, Moly,
+                        CRCA, RR, PIG, MS, Mg_Mix,
+                        RegularCritical, LastBoxTemp, Remarks
+                    )
+                    VALUES (
+                        @Customer, @DrgNo, @Description, @Grade, @PartWeight,
+                        @MinMaxThickness, @ThicknessGroup, @BaseChe_C, @BaseChe_Si,
+                        @C, @Si, @Mn, @P, @S,
+                        @Cr, @Cu, @Mg_Chem, @CE, @Nickel, @Moly,
+                        @CRCA, @RR, @PIG, @MS, @Mg_Mix,
+                        @RegularCritical, @LastBoxTemp, @Remarks
+                    )
+                `;
+                successCount++;
+            } catch (rowErr) {
+                errorCount++;
+                errors.push(`Row ${rowNumber}: ${rowErr.message}`);
+            }
+        }
+
+        logger.info(`[Lab Import] Completed: ${successCount} imported, ${skippedCount} skipped, ${errorCount} errors`);
+        res.json({
+            success: true,
+            message: `Import completed. ${successCount} new records imported, ${skippedCount} duplicates skipped.`,
+            successCount,
+            skippedCount,
+            errorCount,
+            errors: errors.slice(0, 10), // Return first 10 errors only
+            skippedRows: skippedRows.slice(0, 10) // Return first 10 skipped rows
+        });
+    } catch (err) {
+        logger.error('Error importing Excel file:', err);
+        res.status(500).json({ error: 'Failed to import Excel file: ' + err.message });
+    }
+};

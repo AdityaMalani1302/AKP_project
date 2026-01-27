@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, getPool } = require('../config/db');
+const { cacheMiddleware } = require('../utils/cache');
 const { parseDateRange, buildMonthsInRange, buildMonthConditions } = require('../utils/dateHelpers');
 
 // =============================================
@@ -9,8 +10,8 @@ const { parseDateRange, buildMonthsInRange, buildMonthConditions } = require('..
 // Uses FinanceDashboard view from IcSoftVer3 database
 // =============================================
 
-// GET /finance-dashboard/data - Complete financial data grouped by category and month
-router.get('/data', async (req, res) => {
+// GET /finance-dashboard/data - Complete financial data grouped by category and month (cached 5 min)
+router.get('/data', cacheMiddleware('finance-data', 300), async (req, res) => {
     try {
         const { fromDate, toDate } = req.query;
         

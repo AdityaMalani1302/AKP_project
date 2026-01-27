@@ -20,6 +20,16 @@ import api from '../api';
 import ExportButtons from './common/ExportButtons';
 import { DashboardSkeleton, CardSkeleton, ChartSkeleton } from './common/Skeletons';
 import { ErrorBoundary } from 'react-error-boundary';
+import {
+    applyChartDefaults,
+    CHART_COLORS,
+    getLineChartOptions,
+    getBarChartOptions,
+    getHorizontalBarOptions,
+    getStackedBarOptions,
+    getDoughnutOptions,
+    getMoMGrowthOptions
+} from '../utils/chartConfig';
 import './dashboard/Dashboard.css';
 
 // Lazy load the 3D globe component (uses Three.js which is ~1.5MB)
@@ -87,22 +97,8 @@ ChartJS.register(
     ChartDataLabels
 );
 
-// Disable datalabels globally by default (only enable for Pie/Donut charts)
-ChartJS.defaults.plugins.datalabels = { display: false };
-
-// Set global darker font colors for all charts
-ChartJS.defaults.color = '#111827'; // Near black for text
-ChartJS.defaults.plugins.legend.labels.color = '#111827';
-ChartJS.defaults.plugins.title.color = '#030712';
-ChartJS.defaults.scale.ticks.color = '#1f2937';
-ChartJS.defaults.scale.title.color = '#1f2937';
-
-// Set global font sizes for better readability
-ChartJS.defaults.font.size = 13;
-ChartJS.defaults.plugins.legend.labels.font = { size: 13 };
-ChartJS.defaults.plugins.title.font = { size: 15, weight: 'bold' };
-ChartJS.defaults.scale.ticks.font = { size: 12 };
-ChartJS.defaults.scale.title.font = { size: 13 };
+// Apply global chart defaults from shared config
+applyChartDefaults(ChartJS);
 
 const REFRESH_INTERVAL = 120000; // 2 minutes - reduces server load while keeping data fresh
 
@@ -584,7 +580,25 @@ const SalesDashboard = () => {
                     pointBackgroundColor: valueGrowth.map(v => v >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'),
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2,
-                    pointHoverRadius: 7
+                    pointHoverRadius: 7,
+                    datalabels: {
+                        display: true,
+                        align: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'top' : 'bottom';
+                        },
+                        anchor: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'end' : 'start';
+                        },
+                        offset: 6,
+                        color: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)';
+                        },
+                        font: { weight: 'bold', size: 13 },
+                        formatter: (value) => `${value >= 0 ? '+' : ''}${value}%`
+                    }
                 },
                 {
                     label: 'Weight Growth %',
@@ -598,7 +612,25 @@ const SalesDashboard = () => {
                     pointBackgroundColor: weightGrowth.map(v => v >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'),
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2,
-                    pointHoverRadius: 7
+                    pointHoverRadius: 7,
+                    datalabels: {
+                        display: true,
+                        align: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'top' : 'bottom';
+                        },
+                        anchor: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'end' : 'start';
+                        },
+                        offset: 6,
+                        color: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)';
+                        },
+                        font: { weight: 'bold', size: 13 },
+                        formatter: (value) => `${value >= 0 ? '+' : ''}${value}%`
+                    }
                 }
             ]
         };
@@ -632,6 +664,7 @@ const SalesDashboard = () => {
 
         return {
             labels: sorted.map(([name]) => name.length > 20 ? name.substring(0, 20) + '...' : name),
+            fullNames: sorted.map(([name]) => name),
             datasets: [{
                 label: 'Value',
                 data: sorted.map(([, value]) => value),
@@ -704,14 +737,15 @@ const SalesDashboard = () => {
         const sorted = Object.entries(areaValues).sort((a, b) => b[1] - a[1]);
 
         const colors = [
-            'rgba(59, 130, 246, 0.8)',
-            'rgba(16, 185, 129, 0.8)',
-            'rgba(245, 158, 11, 0.8)',
-            'rgba(139, 92, 246, 0.8)',
-            'rgba(236, 72, 153, 0.8)',
-            'rgba(239, 68, 68, 0.8)',
-            'rgba(20, 184, 166, 0.8)',
-            'rgba(99, 102, 241, 0.8)'
+            '#2563EB', // Blue
+            '#DC2626', // Red
+            '#059669', // Green
+            '#D97706', // Amber
+            '#7C3AED', // Purple
+            '#0891B2', // Cyan
+            '#C026D3', // Fuchsia
+            '#4B5563', // Gray
+            '#4F46E5'  // Indigo
         ];
 
         return {
@@ -992,9 +1026,25 @@ const SalesDashboard = () => {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            align: 'top',
+                                            anchor: 'end',
+                                            offset: 4,
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 13 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
                                     },
+                                    layout: {
+                                        padding: { top: 20 }
+                                    },
                                     scales: {
+                                        x: {
+                                            offset: true,
+                                            grid: { display: false }
+                                        },
                                         y: {
                                             beginAtZero: true,
                                             ticks: {
@@ -1025,7 +1075,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Monthly Sales - Total Value (Domestic + Export)</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '300px' }}>
+                    <div style={{ height: '380px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : trendData?.totalValueTrend ? (
@@ -1040,9 +1090,25 @@ const SalesDashboard = () => {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            align: 'top',
+                                            anchor: 'end',
+                                            offset: 4,
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 13 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
                                     },
+                                    layout: {
+                                        padding: { top: 20 }
+                                    },
                                     scales: {
+                                        x: {
+                                            offset: true,
+                                            grid: { display: false }
+                                        },
                                         y: {
                                             beginAtZero: true,
                                             ticks: {
@@ -1078,12 +1144,23 @@ const SalesDashboard = () => {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { position: 'top' },
+                                        legend: { position: 'bottom' },
                                         tooltip: {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            anchor: 'end',
+                                            align: 'top',
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 12 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
+                                    },
+                                    layout: {
+                                        padding: { top: 15 }
                                     },
                                     scales: {
                                         y: {
@@ -1112,7 +1189,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📊 Monthly Sales - Domestic vs Export (Value)</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : trendData?.valueData ? (
@@ -1122,12 +1199,23 @@ const SalesDashboard = () => {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { position: 'top' },
+                                        legend: { position: 'bottom' },
                                         tooltip: {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            anchor: 'end',
+                                            align: 'top',
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 12 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
+                                    },
+                                    layout: {
+                                        padding: { top: 15 }
                                     },
                                     scales: {
                                         y: {
@@ -1152,7 +1240,7 @@ const SalesDashboard = () => {
                     onClick={() => setExpandedChart({
                         title: '⚖️ Monthly Sales - Domestic vs Export (Weight)',
                         content: trendData?.weightData ? (
-                            <Bar data={trendData.weightData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${formatWeight(context.raw)}` } } }, scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatWeight(value) } } } }} />
+                            <Bar data={trendData.weightData} options={{ responsive: true, maintainAspectRatio: false, layout: { padding: { top: 15 } }, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${formatWeight(context.raw)}` } }, datalabels: { display: true, anchor: 'end', align: 'top', color: '#1F2937', font: { weight: 'bold', size: 12 }, formatter: (value) => formatWeight(value) } }, scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatWeight(value) } } } }} />
                         ) : <div>No data</div>
                     })}
                     style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1161,7 +1249,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>⚖️ Monthly Sales - Domestic vs Export (Weight)</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : trendData?.weightData ? (
@@ -1171,12 +1259,23 @@ const SalesDashboard = () => {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { position: 'top' },
+                                        legend: { position: 'bottom' },
                                         tooltip: {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatWeight(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            anchor: 'end',
+                                            align: 'top',
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 12 },
+                                            formatter: (value) => formatWeight(value)
                                         }
+                                    },
+                                    layout: {
+                                        padding: { top: 15 }
                                     },
                                     scales: {
                                         y: {
@@ -1213,9 +1312,25 @@ const SalesDashboard = () => {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            align: 'top',
+                                            anchor: 'end',
+                                            offset: 4,
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 13 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
                                     },
+                                    layout: {
+                                        padding: { top: 20 }
+                                    },
                                     scales: {
+                                        x: {
+                                            offset: true,
+                                            grid: { display: false }
+                                        },
                                         y: {
                                             beginAtZero: true,
                                             ticks: {
@@ -1246,7 +1361,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 Monthly Sales Trend - Domestic vs Export (Value)</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '320px' }}>
+                    <div style={{ height: '400px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : trendData?.valueTrendLine ? (
@@ -1261,9 +1376,25 @@ const SalesDashboard = () => {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            align: 'top',
+                                            anchor: 'end',
+                                            offset: 4,
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 13 },
+                                            formatter: (value) => formatCurrency(value)
                                         }
                                     },
+                                    layout: {
+                                        padding: { top: 20 }
+                                    },
                                     scales: {
+                                        x: {
+                                            offset: true,
+                                            grid: { display: false }
+                                        },
                                         y: {
                                             beginAtZero: true,
                                             ticks: {
@@ -1299,7 +1430,22 @@ const SalesDashboard = () => {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { position: 'top' },
+                                        legend: {
+                                            position: 'top',
+                                            labels: {
+                                                usePointStyle: true,
+                                                generateLabels: (chart) => {
+                                                    return chart.data.datasets.map((dataset, i) => ({
+                                                        text: dataset.label,
+                                                        fillStyle: dataset.borderColor,
+                                                        strokeStyle: dataset.borderColor,
+                                                        pointStyle: 'circle',
+                                                        hidden: !chart.isDatasetVisible(i),
+                                                        datasetIndex: i
+                                                    }));
+                                                }
+                                            }
+                                        },
                                         tooltip: {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${context.raw}%`
@@ -1339,7 +1485,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📈 Month-over-Month (MoM) Growth %</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : momGrowthData ? (
@@ -1349,7 +1495,22 @@ const SalesDashboard = () => {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { position: 'top' },
+                                        legend: {
+                                            position: 'top',
+                                            labels: {
+                                                usePointStyle: true,
+                                                generateLabels: (chart) => {
+                                                    return chart.data.datasets.map((dataset, i) => ({
+                                                        text: dataset.label,
+                                                        fillStyle: dataset.borderColor,
+                                                        strokeStyle: dataset.borderColor,
+                                                        pointStyle: 'circle',
+                                                        hidden: !chart.isDatasetVisible(i),
+                                                        datasetIndex: i
+                                                    }));
+                                                }
+                                            }
+                                        },
                                         tooltip: {
                                             callbacks: {
                                                 label: (context) => `${context.dataset.label}: ${context.raw}%`
@@ -1582,7 +1743,50 @@ const SalesDashboard = () => {
                     onClick={() => setExpandedChart({
                         title: '🏆 Top 5 Customers',
                         content: topCustomersData ? (
-                            <Bar data={topCustomersData} options={{ indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => formatCurrency(context.raw) } } }, scales: { x: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } } } }} />
+                            <Bar 
+                                data={topCustomersData} 
+                                options={{ 
+                                    indexAxis: 'y', 
+                                    responsive: true, 
+                                    maintainAspectRatio: false, 
+                                    layout: { padding: { right: 50 } },
+                                    plugins: { 
+                                        legend: { display: false }, 
+                                        tooltip: { 
+                                            callbacks: { 
+                                                title: (tooltipItems) => topCustomersData?.fullNames?.[tooltipItems[0].dataIndex] || tooltipItems[0].label,
+                                                label: (context) => formatCurrency(context.raw) 
+                                            } 
+                                        },
+                                        datalabels: {
+                                            labels: {
+                                                name: {
+                                                    display: true,
+                                                    anchor: 'start',
+                                                    align: 'end',
+                                                    color: '#fff',
+                                                    font: { weight: 'bold', size: 13 },
+                                                    formatter: (value, context) => topCustomersData?.fullNames?.[context.dataIndex] || '',
+                                                    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                                                    textShadowBlur: 4
+                                                },
+                                                value: {
+                                                    display: true,
+                                                    anchor: 'end',
+                                                    align: 'end',
+                                                    color: '#1F2937',
+                                                    font: { weight: 'bold', size: 13 },
+                                                    formatter: (value) => formatCurrency(value)
+                                                }
+                                            }
+                                        }
+                                    }, 
+                                    scales: { 
+                                        x: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } },
+                                        y: { ticks: { display: false } }
+                                    } 
+                                }} 
+                            />
                         ) : <div>No data</div>
                     })}
                     style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1591,7 +1795,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🏆 Top 5 Customers</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '250px' }}>
+                    <div style={{ height: '320px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : topCustomersData ? (
@@ -1601,11 +1805,39 @@ const SalesDashboard = () => {
                                     indexAxis: 'y',
                                     responsive: true,
                                     maintainAspectRatio: false,
+                                    layout: {
+                                        padding: {
+                                            right: 50
+                                        }
+                                    },
                                     plugins: {
                                         legend: { display: false },
                                         tooltip: {
                                             callbacks: {
+                                                title: (tooltipItems) => topCustomersData?.fullNames?.[tooltipItems[0].dataIndex] || tooltipItems[0].label,
                                                 label: (context) => formatCurrency(context.raw)
+                                            }
+                                        },
+                                        datalabels: {
+                                            labels: {
+                                                name: {
+                                                    display: true,
+                                                    anchor: 'start',
+                                                    align: 'end',
+                                                    color: '#fff',
+                                                    font: { weight: 'bold', size: 13 },
+                                                    formatter: (value, context) => topCustomersData?.fullNames?.[context.dataIndex] || '',
+                                                    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                                                    textShadowBlur: 4
+                                                },
+                                                value: {
+                                                    display: true,
+                                                    anchor: 'end',
+                                                    align: 'end',
+                                                    color: '#1F2937',
+                                                    font: { weight: 'bold', size: 13 },
+                                                    formatter: (value) => formatCurrency(value)
+                                                }
                                             }
                                         }
                                     },
@@ -1614,6 +1846,11 @@ const SalesDashboard = () => {
                                             beginAtZero: true,
                                             ticks: {
                                                 callback: (value) => formatCurrency(value)
+                                            }
+                                        },
+                                        y: {
+                                            ticks: {
+                                                display: false
                                             }
                                         }
                                     }
@@ -1632,7 +1869,7 @@ const SalesDashboard = () => {
                     onClick={() => setExpandedChart({
                         title: '🥧 Domestic vs Export',
                         content: categoryData ? (
-                            <Doughnut data={categoryData} options={{ responsive: true, maintainAspectRatio: false, cutout: '35%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatCurrency(context.raw)}` } }, datalabels: { display: true, color: '#111827', font: { weight: 'bold', size: 14 }, formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1); return percentage > 5 ? `${percentage}%` : ''; }, anchor: 'center', align: 'center' } } }} />
+                            <Doughnut data={categoryData} options={{ responsive: true, maintainAspectRatio: false, cutout: '35%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatCurrency(context.raw)}` } }, datalabels: { display: true, color: '#111827', font: { weight: 'bold', size: 15 }, formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1); return percentage > 5 ? `${percentage}%` : ''; }, anchor: 'center', align: 'center' } } }} />
                         ) : <div>No data</div>
                     })}
                     style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1641,7 +1878,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🥧 Domestic vs Export</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '250px' }}>
+                    <div style={{ height: '320px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : categoryData ? (
@@ -1692,7 +1929,7 @@ const SalesDashboard = () => {
                     onClick={() => setExpandedChart({
                         title: '📦 Sales by Segment',
                         content: segmentChartData ? (
-                            <Bar data={segmentChartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => formatCurrency(context.raw) } } }, scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } } } }} />
+                            <Bar data={segmentChartData} options={{ responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => formatCurrency(context.raw) } }, datalabels: { display: true, anchor: 'end', align: 'top', color: '#1F2937', font: { weight: 'bold', size: 13 }, formatter: (value) => formatCurrency(value) } }, scales: { y: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } } } }} />
                         ) : <div>No data</div>
                     })}
                     style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1701,7 +1938,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>📦 Sales by Segment</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '250px' }}>
+                    <div style={{ height: '320px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : segmentChartData ? (
@@ -1716,6 +1953,19 @@ const SalesDashboard = () => {
                                             callbacks: {
                                                 label: (context) => formatCurrency(context.raw)
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true,
+                                            anchor: 'end',
+                                            align: 'top',
+                                            color: '#1F2937',
+                                            font: { weight: 'bold', size: 13 },
+                                            formatter: (value) => formatCurrency(value)
+                                        }
+                                    },
+                                    layout: {
+                                        padding: {
+                                            top: 20
                                         }
                                     },
                                     scales: {
@@ -1741,7 +1991,7 @@ const SalesDashboard = () => {
                     onClick={() => setExpandedChart({
                         title: '🌍 Customer Area Group Distribution',
                         content: areaGroupData ? (
-                            <Pie data={areaGroupData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 15, font: { size: 14 } } }, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatCurrency(context.raw)}` } }, datalabels: { display: true, color: '#111827', font: { weight: 'bold', size: 14 }, formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1); return percentage > 5 ? `${percentage}%` : ''; }, anchor: 'center', align: 'center' } } }} />
+                            <Pie data={areaGroupData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 15, font: { size: 15 } } }, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatCurrency(context.raw)}` } }, datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 17 }, formatter: (value, context) => { const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); const percentage = ((value / total) * 100).toFixed(1); return percentage > 5 ? `${percentage}%` : ''; }, anchor: 'center', align: 'center', textShadowColor: 'rgba(0, 0, 0, 0.5)', textShadowBlur: 4 } } }} />
                         ) : <div>No data</div>
                     })}
                     style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
@@ -1750,7 +2000,7 @@ const SalesDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>🌍 Customer Area Group Distribution</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '350px', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ height: '420px', display: 'flex', justifyContent: 'center' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>
                         ) : areaGroupData ? (
@@ -1765,7 +2015,7 @@ const SalesDashboard = () => {
                                             labels: {
                                                 boxWidth: 12,
                                                 padding: 15,
-                                                font: { size: 11 }
+                                                font: { size: 15 }
                                             }
                                         },
                                         tooltip: {
@@ -1775,11 +2025,13 @@ const SalesDashboard = () => {
                                         },
                                         datalabels: {
                                             display: true,
-                                            color: '#111827',
+                                            color: '#fff',
                                             font: {
                                                 weight: 'bold',
-                                                size: 11
+                                                size: 14
                                             },
+                                            textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                                            textShadowBlur: 4,
                                             formatter: (value, context) => {
                                                 const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                                                 const percentage = ((value / total) * 100).toFixed(1);

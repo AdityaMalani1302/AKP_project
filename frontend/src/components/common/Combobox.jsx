@@ -27,22 +27,22 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
         }
     }, [value, options, getDisplayValue]);
 
-    // Handle clicking outside to close and accept value
+    // Handle clicking outside to close and restore display value
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
                 if (open) {
                     setOpen(false);
-                    // Accept the typed value when clicking outside
-                    if (inputValue !== value) {
-                        onChange(inputValue);
-                    }
+                    // Restore inputValue to the display value of the current selection
+                    // This prevents clearing the value when clicking outside without selecting
+                    const displayVal = getDisplayValue(value);
+                    setInputValue(displayVal);
                 }
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [open, inputValue, value, onChange]);
+    }, [open, value, getDisplayValue]);
 
     const handleInputChange = (newValue) => {
         setInputValue(newValue);

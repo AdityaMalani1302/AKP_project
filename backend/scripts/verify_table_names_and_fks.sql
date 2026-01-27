@@ -208,6 +208,78 @@ END
 PRINT '';
 
 -- ============================================
+-- 2B. DRAWINGMASTER COLUMNS VERIFICATION
+-- ============================================
+PRINT '';
+PRINT '=== 2B. DRAWINGMASTER COLUMNS VERIFICATION ===';
+PRINT '';
+
+DECLARE @ExpectedDMColumns TABLE (ColumnName NVARCHAR(128), DataType NVARCHAR(50), Category NVARCHAR(50));
+INSERT INTO @ExpectedDMColumns VALUES
+    -- Primary Key
+    ('DrawingMasterId', 'int', 'Key'),
+    -- Serial No (user-defined)
+    ('No', 'nvarchar', 'Main'),
+    -- Main Details
+    ('Customer', 'nvarchar', 'Main'),
+    ('DrawingNo', 'nvarchar', 'Main'),
+    ('RevNo', 'nvarchar', 'Main'),
+    ('Description', 'nvarchar', 'Main'),
+    -- Grade Details
+    ('CustomerGrade', 'nvarchar', 'Grade'),
+    ('AKPGrade', 'nvarchar', 'Grade'),
+    -- Additional Info
+    ('Remarks', 'nvarchar', 'Info'),
+    ('Comments', 'nvarchar', 'Info'),
+    -- Attachment
+    ('AttachmentPath', 'nvarchar', 'Attachment'),
+    ('AttachmentName', 'nvarchar', 'Attachment'),
+    -- Timestamps
+    ('CreatedAt', 'datetime', 'Timestamp'),
+    ('UpdatedAt', 'datetime', 'Timestamp');
+
+-- Check DrawingMaster columns
+IF OBJECT_ID('DrawingMaster') IS NOT NULL
+BEGIN
+    PRINT 'DrawingMaster Columns Status:';
+    PRINT '------------------------------';
+    
+    SELECT 
+        ec.ColumnName,
+        ec.DataType AS ExpectedType,
+        COALESCE(c.DATA_TYPE, 'MISSING') AS ActualType,
+        CASE 
+            WHEN c.COLUMN_NAME IS NULL THEN 'MISSING'
+            WHEN c.DATA_TYPE <> ec.DataType THEN 'TYPE MISMATCH'
+            ELSE 'OK'
+        END AS Status,
+        ec.Category
+    FROM @ExpectedDMColumns ec
+    LEFT JOIN INFORMATION_SCHEMA.COLUMNS c 
+        ON c.TABLE_NAME = 'DrawingMaster' AND c.COLUMN_NAME = ec.ColumnName
+    ORDER BY ec.Category, ec.ColumnName;
+    
+    -- Summary
+    DECLARE @DMTotal INT, @DMOK INT, @DMMissing INT, @DMMismatch INT;
+    SELECT @DMTotal = COUNT(*) FROM @ExpectedDMColumns;
+    SELECT @DMOK = COUNT(*) FROM @ExpectedDMColumns ec 
+        JOIN INFORMATION_SCHEMA.COLUMNS c ON c.TABLE_NAME = 'DrawingMaster' AND c.COLUMN_NAME = ec.ColumnName AND c.DATA_TYPE = ec.DataType;
+    SELECT @DMMissing = COUNT(*) FROM @ExpectedDMColumns ec 
+        LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON c.TABLE_NAME = 'DrawingMaster' AND c.COLUMN_NAME = ec.ColumnName
+        WHERE c.COLUMN_NAME IS NULL;
+    SET @DMMismatch = @DMTotal - @DMOK - @DMMissing;
+    
+    PRINT '';
+    PRINT 'Summary: ' + CAST(@DMOK AS VARCHAR) + ' OK, ' + CAST(@DMMissing AS VARCHAR) + ' missing, ' + CAST(@DMMismatch AS VARCHAR) + ' type mismatches';
+END
+ELSE
+BEGIN
+    PRINT 'ERROR: DrawingMaster table does not exist!';
+END
+
+PRINT '';
+
+-- ============================================
 -- 3. FOREIGN KEY VERIFICATION
 -- ============================================
 PRINT '';

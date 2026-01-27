@@ -112,7 +112,7 @@ const useAutoSave = (key, data, delay = 2000, enabled = true) => {
         if (diff < 60) return `${diff} seconds ago`;
         if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
         if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-        return lastSaved.toLocaleDateString();
+        return lastSaved.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }, [lastSaved]);
 
     return {

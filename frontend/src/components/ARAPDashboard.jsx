@@ -19,6 +19,16 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { format, subMonths } from 'date-fns';
 import api from '../api';
 import ExportButtons from './common/ExportButtons';
+import {
+    applyChartDefaults,
+    CHART_COLORS,
+    getLineChartOptions,
+    getBarChartOptions,
+    getHorizontalBarOptions,
+    getStackedBarOptions,
+    getDoughnutOptions,
+    getMoMGrowthOptions
+} from '../utils/chartConfig';
 import './dashboard/Dashboard.css';
 
 // Register Chart.js components
@@ -36,22 +46,8 @@ ChartJS.register(
     ChartDataLabels
 );
 
-// Disable datalabels globally by default
-ChartJS.defaults.plugins.datalabels = { display: false };
-
-// Set global darker font colors for all charts
-ChartJS.defaults.color = '#111827';
-ChartJS.defaults.plugins.legend.labels.color = '#111827';
-ChartJS.defaults.plugins.title.color = '#030712';
-ChartJS.defaults.scale.ticks.color = '#1f2937';
-ChartJS.defaults.scale.title.color = '#1f2937';
-
-// Set global font sizes for better readability
-ChartJS.defaults.font.size = 13;
-ChartJS.defaults.plugins.legend.labels.font = { size: 13 };
-ChartJS.defaults.plugins.title.font = { size: 15, weight: 'bold' };
-ChartJS.defaults.scale.ticks.font = { size: 12 };
-ChartJS.defaults.scale.title.font = { size: 13 };
+// Apply global chart defaults from shared config
+applyChartDefaults(ChartJS);
 
 const REFRESH_INTERVAL = 120000; // 2 minutes
 
@@ -453,6 +449,7 @@ const ARAPDashboard = () => {
         // Calculate average deviation and sort by deviation (worst first)
         const sorted = Object.entries(customerDeviation)
             .map(([name, data]) => ({
+                fullName: name,
                 name: name.length > 15 ? name.substring(0, 13) + '...' : name,
                 deviation: data.count > 0 ? data.totalDeviation / data.count : 0
             }))
@@ -461,10 +458,12 @@ const ARAPDashboard = () => {
             .slice(0, 10);
 
         const labels = sorted.map(item => item.name);
+        const fullNames = sorted.map(item => item.fullName);
         const deviations = sorted.map(item => Math.round(item.deviation));
 
         return {
             labels,
+            fullNames,
             datasets: [{
                 label: 'Days Over/Under Credit',
                 data: deviations,
@@ -532,11 +531,13 @@ const ARAPDashboard = () => {
             .slice(0, 10);
 
         const labels = sorted.map(([name]) => name.length > 20 ? name.substring(0, 18) + '...' : name);
+        const fullNames = sorted.map(([name]) => name);
         const data = sorted.map(([, val]) => val.amount);
         const categories = sorted.map(([, val]) => val.category);
 
         return {
             labels,
+            fullNames,
             datasets: [{
                 label: 'Outstanding Amount',
                 data,
@@ -588,6 +589,7 @@ const ARAPDashboard = () => {
             .slice(0, 10);
 
         const labels = sorted.map(([name]) => name.length > 15 ? name.substring(0, 13) + '...' : name);
+        const fullNames = sorted.map(([name]) => name);
         // Non-overdue portion = Outstanding - Overdue
         const nonOverdueData = sorted.map(([, data]) => Math.max(0, data.outstanding - data.overdue));
         const overdueData = sorted.map(([, data]) => data.overdue);
@@ -596,6 +598,7 @@ const ARAPDashboard = () => {
 
         return {
             labels,
+            fullNames,
             datasets: [
                 {
                     label: 'Non-Overdue',
@@ -802,6 +805,17 @@ const ARAPDashboard = () => {
                 callbacks: {
                     label: (context) => formatCurrency(context.raw)
                 }
+            },
+            datalabels: {
+                display: (context) => context.dataset.data[context.dataIndex] > 0,
+                anchor: 'center',
+                align: 'center',
+                color: '#fff',
+                font: {
+                    weight: 'bold',
+                    size: 12
+                },
+                formatter: (value) => formatCurrency(value)
             }
         },
         scales: {
@@ -824,6 +838,17 @@ const ARAPDashboard = () => {
                 callbacks: {
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: (context) => context.dataset.data[context.dataIndex] > 0,
+                anchor: 'center',
+                align: 'center',
+                color: '#fff',
+                font: {
+                    weight: 'bold',
+                    size: 11
+                },
+                formatter: (value) => formatCurrency(value)
             }
         },
         scales: {
@@ -845,7 +870,7 @@ const ARAPDashboard = () => {
     };
 
     // 3. Credit Deviation Bar Options (can show negative values)
-    const creditDeviationOptions = {
+    const creditDeviationOptions = useMemo(() => ({
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: 'y',
@@ -853,12 +878,35 @@ const ARAPDashboard = () => {
             legend: { display: false },
             tooltip: {
                 callbacks: {
+                    title: (tooltipItems) => {
+                        if (creditDeviationData && creditDeviationData.fullNames) {
+                            return creditDeviationData.fullNames[tooltipItems[0].dataIndex];
+                        }
+                        return tooltipItems[0].label;
+                    },
                     label: (context) => {
                         const days = context.raw;
                         if (days > 0) return `${days} days over credit`;
                         if (days < 0) return `${Math.abs(days)} days within credit`;
                         return 'On credit limit';
                     }
+                }
+            },
+            datalabels: {
+                display: true,
+                anchor: 'start',
+                align: 'right',
+                offset: 4,
+                color: '#fff',
+                font: {
+                    weight: 'bold',
+                    size: 10
+                },
+                formatter: (value, context) => {
+                    if (creditDeviationData && creditDeviationData.fullNames) {
+                        return creditDeviationData.fullNames[context.dataIndex];
+                    }
+                    return '';
                 }
             }
         },
@@ -868,9 +916,14 @@ const ARAPDashboard = () => {
                 ticks: {
                     callback: (value) => `${value} days`
                 }
+            },
+            y: {
+                ticks: {
+                    display: false
+                }
             }
         }
-    };
+    }), [creditDeviationData]);
 
     // ============================================
     // RECOVERY SECTION CHART OPTIONS
@@ -886,6 +939,18 @@ const ARAPDashboard = () => {
                 callbacks: {
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: true, // Show labels
+                align: 'top',
+                anchor: 'center',
+                offset: 4,
+                color: (context) => context.dataset.borderColor, // Match line color
+                font: { weight: 'bold', size: 13 },
+                formatter: (value) => formatCurrency(value),
+                backgroundColor: 'rgba(255, 255, 255, 0.75)', // Add background for readability
+                borderRadius: 4,
+                padding: 2
             }
         },
         scales: {
@@ -908,6 +973,14 @@ const ARAPDashboard = () => {
                 callbacks: {
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`
                 }
+            },
+            datalabels: {
+                display: (context) => context.dataset.data[context.dataIndex] > 0,
+                anchor: 'center',
+                align: 'center',
+                color: '#fff',
+                font: { weight: 'bold', size: 13 },
+                formatter: (value) => formatCurrency(value)
             }
         },
         scales: {
@@ -932,6 +1005,24 @@ const ARAPDashboard = () => {
                 callbacks: {
                     label: (context) => `${context.raw.toFixed(1)}%`
                 }
+            },
+            datalabels: {
+                display: true,
+                color: (context) => {
+                    const value = context.dataset.data[context.dataIndex];
+                    return value >= 0 ? 'rgba(16, 185, 129, 1)' : 'rgba(220, 38, 38, 1)';
+                },
+                anchor: (context) => {
+                    const value = context.dataset.data[context.dataIndex];
+                    return value >= 0 ? 'end' : 'start';
+                },
+                align: (context) => {
+                    const value = context.dataset.data[context.dataIndex];
+                    return value >= 0 ? 'top' : 'bottom';
+                },
+                offset: 4,
+                font: { weight: 'bold', size: 13 },
+                formatter: (value) => `${value.toFixed(1)}%`
             }
         },
         scales: {
@@ -952,6 +1043,12 @@ const ARAPDashboard = () => {
             legend: { position: 'top' },
             tooltip: {
                 callbacks: {
+                    title: (tooltipItems) => {
+                        if (clientsBalanceOverdueData && clientsBalanceOverdueData.fullNames) {
+                            return clientsBalanceOverdueData.fullNames[tooltipItems[0].dataIndex];
+                        }
+                        return tooltipItems[0].label;
+                    },
                     label: (context) => `${context.dataset.label}: ${formatCurrency(context.raw)}`,
                     afterBody: (tooltipItems) => {
                         if (clientsBalanceOverdueData && clientsBalanceOverdueData.totalData) {
@@ -967,7 +1064,7 @@ const ARAPDashboard = () => {
                 anchor: 'end',
                 align: 'top',
                 color: '#1a1a2e',
-                font: { weight: 'bold', size: 10 },
+                font: { weight: 'bold', size: 13 },
                 formatter: (value, context) => {
                     if (clientsBalanceOverdueData && clientsBalanceOverdueData.totalData) {
                         return formatCurrency(clientsBalanceOverdueData.totalData[context.dataIndex]);
@@ -989,7 +1086,7 @@ const ARAPDashboard = () => {
     }), [clientsBalanceOverdueData]);
 
     // Simple horizontal bar options for top 10
-    const horizontalBarOptions = {
+    const horizontalBarOptions = useMemo(() => ({
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: 'y',
@@ -997,7 +1094,30 @@ const ARAPDashboard = () => {
             legend: { display: false },
             tooltip: {
                 callbacks: {
+                    title: (tooltipItems) => {
+                        if (top10Data && top10Data.fullNames) {
+                            return top10Data.fullNames[tooltipItems[0].dataIndex];
+                        }
+                        return tooltipItems[0].label;
+                    },
                     label: (context) => formatCurrency(context.raw)
+                }
+            },
+            datalabels: {
+                display: true,
+                anchor: 'start',
+                align: 'right',
+                offset: 4,
+                color: '#fff',
+                font: {
+                    weight: 'bold',
+                    size: 10
+                },
+                formatter: (value, context) => {
+                    if (top10Data && top10Data.fullNames) {
+                        return top10Data.fullNames[context.dataIndex];
+                    }
+                    return '';
                 }
             }
         },
@@ -1009,7 +1129,7 @@ const ARAPDashboard = () => {
                 }
             }
         }
-    };
+    }), [top10Data]);
 
     const doughnutOptions = {
         responsive: true,
@@ -1290,7 +1410,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Aging Bucket Distribution</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1317,7 +1437,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Category-wise Outstanding</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1352,7 +1472,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Receivable Overdue</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1379,7 +1499,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Credit Period Deviation</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '280px' }}>
+                    <div style={{ height: '350px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1409,7 +1529,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Top 10 Outstanding Customers</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '320px' }}>
+                    <div style={{ height: '400px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1439,7 +1559,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Clients Outstanding & Overdue</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '320px' }}>
+                    <div style={{ height: '400px' }}>
                         {isLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1521,7 +1641,7 @@ const ARAPDashboard = () => {
                         <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Monthly Recovery Trend</h3>
                         <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                     </div>
-                    <div style={{ height: '300px' }}>
+                    <div style={{ height: '380px' }}>
                         {isRecoveryLoading ? (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                 Loading...
@@ -1552,7 +1672,7 @@ const ARAPDashboard = () => {
                             <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Domestic vs Export Contribution</h3>
                             <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                         </div>
-                        <div style={{ height: '280px' }}>
+                        <div style={{ height: '350px' }}>
                             {isRecoveryLoading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                     Loading...
@@ -1576,7 +1696,7 @@ const ARAPDashboard = () => {
                             <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Recovery Mix</h3>
                             <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                         </div>
-                        <div style={{ height: '280px' }}>
+                        <div style={{ height: '350px' }}>
                             {isRecoveryLoading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                     Loading...
@@ -1608,7 +1728,7 @@ const ARAPDashboard = () => {
                             <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Month-over-Month Growth %</h3>
                             <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                         </div>
-                        <div style={{ height: '280px' }}>
+                        <div style={{ height: '350px' }}>
                             {isRecoveryLoading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                     Loading...
@@ -1632,7 +1752,7 @@ const ARAPDashboard = () => {
                             <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#1F2937' }}>Cumulative Recovery</h3>
                             <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Click to expand</span>
                         </div>
-                        <div style={{ height: '280px' }}>
+                        <div style={{ height: '350px' }}>
                             {isRecoveryLoading ? (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                                     Loading...

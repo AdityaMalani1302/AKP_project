@@ -469,7 +469,7 @@ const AssetTab = () => {
                         <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                             <thead style={{ position: 'sticky', top: 0, backgroundColor: '#F9FAFB', zIndex: 1 }}>
                                 <tr>
-                                    {['ID', 'Tag', 'Name', 'Type', 'Status', 'Location', 'Manufacturer', 'Serial No'].map(h => (
+                                    {['Sr. No.', 'Tag', 'Name', 'Type', 'Status', 'Location', 'Manufacturer', 'Serial No'].map(h => (
                                         <th key={h} style={{ padding: '0.75rem', fontWeight: '600', borderBottom: '2px solid #E5E7EB', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -478,7 +478,7 @@ const AssetTab = () => {
                                 {assets.length === 0 ? (
                                     <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>No records found</td></tr>
                                 ) : (
-                                    assets.map((a) => (
+                                    assets.map((a, index) => (
                                         <tr
                                             key={a.AssetId}
                                             onClick={() => handleRowClick(a)}
@@ -487,7 +487,7 @@ const AssetTab = () => {
                                                 backgroundColor: selectedId === a.AssetId ? '#DBEAFE' : 'white'
                                             }}
                                         >
-                                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{a.AssetId}</td>
+                                            <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{index + 1}</td>
                                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{a.AssetTagNumber}</td>
                                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{a.AssetName}</td>
                                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #E5E7EB' }}>{a.AssetType}</td>

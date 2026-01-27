@@ -4,6 +4,7 @@ import api from '../api';
 import '../App.css';
 import TableSkeleton from './common/TableSkeleton';
 import DatePicker from './common/DatePicker';
+import { formatDate } from '../styles/sharedStyles';
 
 const SleeveIndent = () => {
     // Step state - 'selection' or 'table'
@@ -61,13 +62,6 @@ const SleeveIndent = () => {
     const handleBack = () => {
         setCurrentStep('selection');
         setSleeveIndentData([]);
-    };
-
-    // Format date for display
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     };
 
     // Format sleeve qty display: (type=qty, type2=qty2) = total

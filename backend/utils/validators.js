@@ -42,7 +42,7 @@ const patternSchema = z.object({
     }).passthrough()).optional(),
     sleeveRows: z.array(z.object({
         sleeve_name: z.string().max(255).optional().nullable(),
-        sleeve_type_size: z.string().max(255).optional().nullable(),
+        sleeve_type_size: z.union([z.string(), z.number()]).optional().nullable().transform(val => val != null ? String(val) : null),
         quantity: z.coerce.number().int().min(0).optional().nullable(),
     }).passthrough()).optional(),
 }).passthrough();

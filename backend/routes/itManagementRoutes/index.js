@@ -11,6 +11,7 @@ const { cacheMiddleware } = require('../../utils/cache');
 const assetsRouter = require('./assets');
 const softwareRouter = require('./software');
 const complaintsRouter = require('./complaints');
+const issuedMaterialRouter = require('./issuedMaterial');
 
 /**
  * Helper middleware to forward routes to a sub-router
@@ -78,5 +79,8 @@ router.use('/complaints', complaintsRouter);
 // Resolved: forward to complaints router's /resolved routes
 router.use('/resolved/:id', forwardToRouterWithId(complaintsRouter, '/resolved'));
 router.use('/resolved', forwardToRouter(complaintsRouter, '/resolved'));
+
+// Issued Material routes: /issued-material, /issued-material/:id, etc.
+router.use('/issued-material', issuedMaterialRouter);
 
 module.exports = router;

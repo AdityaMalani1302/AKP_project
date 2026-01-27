@@ -7,48 +7,49 @@ import api from '../api';
 import AlertDialog from './common/AlertDialog';
 import DatePicker from './common/DatePicker';
 import '../App.css';
+import { formatDate } from '../styles/sharedStyles';
 
 const PlanningEntry = () => {
     const queryClient = useQueryClient();
-    
+
     // Form state
     const [planDate, setPlanDate] = useState('');
     const [selectedPattern, setSelectedPattern] = useState(null);
     const [patterns, setPatterns] = useState([]);
-    
+
     // Parts state
     const [availableParts, setAvailableParts] = useState([]);
     const [selectedParts, setSelectedParts] = useState([]);
     const [loadingParts, setLoadingParts] = useState(false);
-    
+
     // Sleeves selection state (per part)
     const [selectedSleeves, setSelectedSleeves] = useState({}); // { partRowId: sleeveRowId }
-    
+
     // Pattern details state (for info table)
     const [patternDetails, setPatternDetails] = useState(null);
-    
+
     // Configuration state
     const [plateQty, setPlateQty] = useState('');
     const [shift, setShift] = useState('');
     const [mouldBoxSize, setMouldBoxSize] = useState('');
-    
+
     // Staged entries state (calculated table before submit)
     const [stagedEntries, setStagedEntries] = useState([]);
     const [selectedStagedIds, setSelectedStagedIds] = useState(new Set());
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     // Existing records state (from database)
     const [existingRecords, setExistingRecords] = useState([]);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [filterDate, setFilterDate] = useState('');
     const [filterShift, setFilterShift] = useState('');
-    
+
     // Edit/Delete state
     const [editingRecord, setEditingRecord] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [recordToDelete, setRecordToDelete] = useState(null);
-    
+
     // Print preview state
     const [printPlanDate, setPrintPlanDate] = useState('');
     const [printShift, setPrintShift] = useState('');
@@ -195,7 +196,7 @@ const PlanningEntry = () => {
         // Calculate consolidated values for all parts
         // Total Cavity = sum of all parts' cavities
         const totalCavity = selectedParts.reduce((sum, part) => sum + (parseInt(part.Qty) || 1), 0);
-        
+
         // Total Cast Weight = sum of all (cavity × weight per cavity) for each part
         const totalCastWeight = selectedParts.reduce((sum, part) => {
             const cavity = parseInt(part.Qty) || 1;
@@ -205,21 +206,21 @@ const PlanningEntry = () => {
 
         // Part numbers as comma-separated list
         const partNoList = selectedParts.map(part => part.InternalPartNo || part.PartNo).join(', ');
-        
+
         // Part names as comma-separated list
         const partNameList = selectedParts.map(part => part.PartName || '-').join(', ');
-        
+
         // Part row IDs as comma-separated list (for backend reference)
         const partRowIdList = selectedParts.map(part => part.PartRowId).join(',');
 
         // New calculations based on Plate Qty input:
         // Production Qty = Plate Qty * Total Cavity
         const productionQtyValues = plateQtyNum * totalCavity;
-        
+
         // Total Weight = Plate Qty * Total Cast Weight
         // Note: totalCastWeight is weight of ONE MOULD (sum of all cavity weights)
         const totalWeight = plateQtyNum * totalCastWeight;
-        
+
         // No of Heats = Plate Qty / Box Per Heat (rounded: 7.09→7, 7.5→8)
         const noOfHeats = boxPerHeat > 0 ? Math.round(plateQtyNum / boxPerHeat) : 0;
 
@@ -267,17 +268,17 @@ const PlanningEntry = () => {
             plateQty: plateQtyNum, // User input
             totalWeight: totalWeight.toFixed(2), // Calculated: Plate Qty * Cast Weight
             noOfHeats, // Plate Qty / Box Per Heat
-            shift: parseInt(shift),
+            shift: String(shift),
             mouldBoxSize: patternDetails?.Moulding_Box_Size || '-'
         };
 
         setStagedEntries(prev => [...prev, newEntry]);
-        
+
         // Clear selection for next entry
         setSelectedParts([]);
         setPlateQty('');
         setShift('');
-        
+
         toast.success(`Added 1 consolidated entry to calculated table`);
     };
 
@@ -291,11 +292,11 @@ const PlanningEntry = () => {
         try {
             const response = await api.post('/planning-entry', { entries: stagedEntries });
             toast.success(`Successfully submitted ${stagedEntries.length} entry(s)!`);
-            
+
             // Clear all staged entries
             setStagedEntries([]);
             setSelectedStagedIds(new Set());
-            
+
             // Refresh existing records
             fetchExistingRecords();
         } catch (err) {
@@ -319,12 +320,6 @@ const PlanningEntry = () => {
         setMouldBoxSize('');
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-    };
-
     // Handle print preview
     const handlePreviewAndPrint = async () => {
         if (!printPlanDate) {
@@ -344,16 +339,16 @@ const PlanningEntry = () => {
                 const dateMatch = recordDate === printPlanDate;
                 const shiftMatch = record.Shift === parseInt(printShift);
                 const mouldBoxMatch = !printMouldBoxSize || record.MouldBoxSize === printMouldBoxSize;
-                
+
                 return dateMatch && shiftMatch && mouldBoxMatch;
             });
-            
+
             if (filtered.length === 0) {
                 toast.warning('No records found for the selected date and shift');
                 setIsPrintLoading(false);
                 return;
             }
-            
+
             setPrintData(filtered);
             setShowPrintPreview(true);
         } catch (err) {
@@ -380,7 +375,7 @@ const PlanningEntry = () => {
     const filteredRecords = existingRecords.filter(record => {
         let matchDate = true;
         let matchShift = true;
-        
+
         if (filterDate) {
             const recordDate = new Date(record.PlanDate).toISOString().split('T')[0];
             matchDate = recordDate === filterDate;
@@ -470,7 +465,7 @@ const PlanningEntry = () => {
         padding: '0.5rem 0.75rem', border: '1px solid #374151',
         textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.8rem'
     };
-    
+
     // Prepare options for Combobox
     const patternOptions = patterns.map(pattern => ({
         value: pattern.PatternNo,
@@ -499,7 +494,7 @@ const PlanningEntry = () => {
 
                     {/* Pattern No Dropdown */}
                     <div className="form-group">
-                         <Combobox
+                        <Combobox
                             label="Plan Pattern No"
                             options={patternOptions}
                             value={selectedPattern ? selectedPattern.PatternNo : ''}
@@ -540,7 +535,7 @@ const PlanningEntry = () => {
                                         const weight = parseFloat(part.Weight) || 0;
                                         return sum + (cavity * weight);
                                     }, 0);
-                                    
+
                                     const coreType = (() => {
                                         const types = [];
                                         if (patternDetails?.shell_qty) types.push(`Shell=${patternDetails.shell_qty}`);
@@ -548,7 +543,7 @@ const PlanningEntry = () => {
                                         if (patternDetails?.noBake_qty) types.push(`NoBake=${patternDetails.noBake_qty}`);
                                         return types.length > 0 ? types.join(', ') : '-';
                                     })();
-                                    
+
                                     const sleeveInfo = (() => {
                                         const sleeves = patternDetails?.sleeveRows || [];
                                         if (sleeves.length === 0) return '-';
@@ -557,9 +552,9 @@ const PlanningEntry = () => {
                                             .map(s => `${s.sleeve_type_size_name}=${s.quantity || 1}`)
                                             .join(', ') || '-';
                                     })();
-                                    
+
                                     const rowCount = selectedParts.length;
-                                    
+
                                     return selectedParts.map((part, index) => (
                                         <tr key={part.PartRowId || index} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#FEF7ED' }}>
                                             {/* Customer Name - rowSpan on first row */}
@@ -685,7 +680,7 @@ const PlanningEntry = () => {
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem', color: '#B45309' }}>
                         Calculated Planning Entries ({stagedEntries.length} entries)
                     </h3>
-                    
+
 
                     <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
@@ -713,7 +708,7 @@ const PlanningEntry = () => {
                                 {stagedEntries.map((entry) => {
                                     const parts = entry.parts || [{ partNo: entry.partNo, partName: entry.partName, cavity: entry.cavity, weight: 0 }];
                                     const rowCount = parts.length;
-                                    
+
                                     return parts.map((part, partIndex) => (
                                         <tr key={`${entry.id}-${partIndex}`} style={{ backgroundColor: partIndex % 2 === 0 ? 'white' : '#FEF7ED' }}>
                                             {/* Customer Name - rowSpan on first row */}
@@ -874,20 +869,20 @@ const PlanningEntry = () => {
                                     const cavities = (record.Cavity ? String(record.Cavity).split(',') : []).map(s => parseInt(s.trim()) || 0);
                                     // Handle legacy data where Weight might be missing or not a CSV string
                                     const weights = (record.Weight ? String(record.Weight).split(',') : []).map(s => parseFloat(s.trim()) || 0);
-                                    
+
                                     // Determine the number of rows based on PartNo count (default to 1 if empty)
                                     const rowCount = Math.max(partNos.length, 1);
-                                    
+
                                     // Generate rows for this record
                                     return Array.from({ length: rowCount }).map((_, partIndex) => {
                                         const isFirstRow = partIndex === 0;
-                                        
+
                                         // Get individual part details (handle potential index out of bounds)
                                         const currentPartNo = partNos[partIndex] || '-';
                                         const currentPartName = partNames[partIndex] || '-';
                                         const currentCavity = cavities[partIndex] || (rowCount === 1 && record.Cavity ? parseInt(record.Cavity) : 1);
                                         const currentWeight = weights[partIndex] || 0;
-                                        
+
                                         // Calculate per-part Production Qty: PlateQty * PartCavity
                                         const currentProductionQty = (parseInt(record.PlateQty) || 0) * currentCavity;
 
@@ -983,7 +978,7 @@ const PlanningEntry = () => {
                 <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem', color: '#7C3AED' }}>
                     Preview & Print Production Planning
                 </h3>
-                
+
                 <div className="form-grid" style={{ maxWidth: '600px', marginBottom: '1rem' }}>
                     {/* Print Plan Date */}
                     <div className="form-group">
@@ -996,7 +991,7 @@ const PlanningEntry = () => {
                             placeholder="Select print date..."
                         />
                     </div>
-                    
+
                     {/* Print Shift */}
                     <div className="form-group">
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
@@ -1033,7 +1028,7 @@ const PlanningEntry = () => {
                         </select>
                     </div>
                 </div>
-                
+
                 <button
                     onClick={handlePreviewAndPrint}
                     disabled={isPrintLoading}
@@ -1054,7 +1049,7 @@ const PlanningEntry = () => {
 
             {/* Print Preview Modal */}
             {showPrintPreview && (
-                <div 
+                <div
                     className="print-modal-overlay"
                     style={{
                         position: 'fixed',
@@ -1071,7 +1066,7 @@ const PlanningEntry = () => {
                     }}
                     onClick={(e) => e.target === e.currentTarget && setShowPrintPreview(false)}
                 >
-                    <div 
+                    <div
                         className="print-modal-content"
                         style={{
                             backgroundColor: 'white',
@@ -1103,14 +1098,14 @@ const PlanningEntry = () => {
                         </div>
 
                         {/* Print Content */}
-                        <div ref={printRef} className="print-content" style={{ 
-                            border: '2px solid #1e3a5f', 
+                        <div ref={printRef} className="print-content" style={{
+                            border: '2px solid #1e3a5f',
                             padding: '1.5rem',
                             fontFamily: "'Segoe UI', 'Roboto', 'Arial', sans-serif",
                             background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)'
                         }}>
                             {/* Header with Process Card Note */}
-                            <div style={{ 
+                            <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'flex-start',
@@ -1120,12 +1115,12 @@ const PlanningEntry = () => {
                             }}>
                                 {/* Empty left spacer for balance */}
                                 <div style={{ width: '180px' }}></div>
-                                
+
                                 {/* Center: Title */}
                                 <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <h1 style={{ 
-                                        fontSize: '1.4rem', 
-                                        fontWeight: '700', 
+                                    <h1 style={{
+                                        fontSize: '1.4rem',
+                                        fontWeight: '700',
                                         color: '#1e3a5f',
                                         margin: '0 0 0.3rem 0',
                                         letterSpacing: '2px',
@@ -1133,8 +1128,8 @@ const PlanningEntry = () => {
                                     }}>
                                         Production Planning
                                     </h1>
-                                    <p style={{ 
-                                        fontSize: '0.75rem', 
+                                    <p style={{
+                                        fontSize: '0.75rem',
                                         color: '#64748b',
                                         margin: 0,
                                         fontStyle: 'italic'
@@ -1142,9 +1137,9 @@ const PlanningEntry = () => {
                                         Production Planning Department
                                     </p>
                                 </div>
-                                
+
                                 {/* Right: Process Card Note */}
-                                <div style={{ 
+                                <div style={{
                                     backgroundColor: '#FFFF00',
                                     padding: '0.4rem 0.8rem',
                                     fontWeight: '700',
@@ -1158,10 +1153,10 @@ const PlanningEntry = () => {
                             </div>
 
                             {/* Date, Shift, Mould Box Info */}
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                gap: '1.5rem', 
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                gap: '1.5rem',
                                 marginBottom: '1rem',
                                 padding: '0.5rem',
                                 backgroundColor: '#e8f4fd',
@@ -1171,7 +1166,7 @@ const PlanningEntry = () => {
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <span style={{ fontWeight: '600', color: '#374151', fontSize: '0.75rem' }}>Date:</span>
-                                    <span style={{ 
+                                    <span style={{
                                         backgroundColor: '#ffffff',
                                         border: '1px solid #94a3b8',
                                         padding: '0.2rem 0.5rem',
@@ -1185,7 +1180,7 @@ const PlanningEntry = () => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <span style={{ fontWeight: '600', color: '#374151', fontSize: '0.75rem' }}>Shift:</span>
-                                    <span style={{ 
+                                    <span style={{
                                         backgroundColor: '#ffffff',
                                         border: '1px solid #94a3b8',
                                         padding: '0.2rem 0.5rem',
@@ -1201,7 +1196,7 @@ const PlanningEntry = () => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <span style={{ fontWeight: '600', color: '#374151', fontSize: '0.75rem' }}>Mould Box Size:</span>
-                                    <span style={{ 
+                                    <span style={{
                                         backgroundColor: '#ffffff',
                                         border: '1px solid #94a3b8',
                                         padding: '0.2rem 0.5rem',
@@ -1217,7 +1212,7 @@ const PlanningEntry = () => {
 
                             {/* Planning Table */}
                             <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
-                                <table style={{ 
+                                <table style={{
                                     width: '100%',
                                     borderCollapse: 'collapse',
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
@@ -1247,10 +1242,10 @@ const PlanningEntry = () => {
                                             const partNames = (record.PartName || '').split(',').map(s => s.trim());
                                             const cavities = (record.Cavity ? String(record.Cavity).split(',') : []).map(s => parseInt(s.trim()) || 0);
                                             const weights = (record.Weight ? String(record.Weight).split(',') : []).map(s => parseFloat(s.trim()) || 0);
-                                            
+
                                             // Determine the number of rows based on PartNo count
                                             const rowCount = Math.max(partNos.length, 1);
-                                            
+
                                             return Array.from({ length: rowCount }).map((_, partIndex) => {
                                                 const isFirstRow = partIndex === 0;
                                                 const currentPartNo = partNos[partIndex] || '-';
@@ -1260,33 +1255,33 @@ const PlanningEntry = () => {
                                                 const currentProductionQty = (parseInt(record.PlateQty) || 0) * currentCavity;
 
                                                 return (
-                                                    <tr key={`${record.EntryId}-${partIndex}`} style={{ 
+                                                    <tr key={`${record.EntryId}-${partIndex}`} style={{
                                                         backgroundColor: recordIndex % 2 === 0 ? '#ffffff' : '#f8fafc'
                                                     }}>
                                                         {/* Customer Name - rowSpan */}
                                                         {isFirstRow && (
                                                             <td rowSpan={rowCount} style={{ padding: '0.25rem', border: '1px solid #94a3b8', color: '#334155', fontSize: '0.65rem', verticalAlign: 'middle' }}>{record.CustomerName || '-'}</td>
                                                         )}
-                                                        
+
                                                         {/* Individual Part Columns */}
                                                         <td style={{ padding: '0.25rem', border: '1px solid #94a3b8', fontWeight: '500', color: '#1e3a5f', fontSize: '0.65rem' }}>{currentPartNo}</td>
                                                         <td style={{ padding: '0.25rem', border: '1px solid #94a3b8', color: '#334155', fontSize: '0.65rem' }}>{currentPartName}</td>
                                                         <td style={{ padding: '0.25rem', border: '1px solid #94a3b8', textAlign: 'center', fontWeight: '600', color: '#7C3AED', fontSize: '0.65rem' }}>{currentCavity}</td>
                                                         <td style={{ padding: '0.25rem', border: '1px solid #94a3b8', textAlign: 'center', fontWeight: '600', color: '#059669', fontSize: '0.65rem' }}>{currentWeight > 0 ? currentWeight.toFixed(2) : '-'}</td>
-                                                        
+
                                                         {/* Core - rowSpan */}
                                                         {isFirstRow && (
                                                             <td rowSpan={rowCount} style={{ padding: '0.25rem', border: '1px solid #94a3b8', textAlign: 'center', color: '#334155', fontSize: '0.65rem', verticalAlign: 'middle' }}>{record.CoreType || '-'}</td>
                                                         )}
-                                                        
+
                                                         {/* Plate Qty - rowSpan */}
                                                         {isFirstRow && (
                                                             <td rowSpan={rowCount} style={{ padding: '0.25rem', border: '1px solid #94a3b8', textAlign: 'center', fontWeight: '600', color: '#1e3a5f', fontSize: '0.65rem', backgroundColor: '#FEF9C3', verticalAlign: 'middle' }}>{record.PlateQty || '-'}</td>
                                                         )}
-                                                        
+
                                                         {/* Part Qty - Individual per part */}
                                                         <td style={{ padding: '0.25rem', border: '1px solid #94a3b8', textAlign: 'center', fontWeight: '600', color: '#1e3a5f', fontSize: '0.65rem', backgroundColor: '#FEF9C3' }}>{currentProductionQty}</td>
-                                                        
+
                                                         {/* Remaining columns - rowSpan */}
                                                         {isFirstRow && (
                                                             <>
@@ -1306,15 +1301,15 @@ const PlanningEntry = () => {
                             </div>
 
                             {/* Signature Section */}
-                            <div style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
                                 marginTop: '3rem',
                                 paddingTop: '1.5rem',
                                 borderTop: '2px solid #1e3a5f'
                             }}>
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ 
+                                    <div style={{
                                         borderTop: '1px solid #64748b',
                                         width: '150px',
                                         marginTop: '2.5rem',
@@ -1324,7 +1319,7 @@ const PlanningEntry = () => {
                                     <span style={{ fontWeight: '600', color: '#374151', fontSize: '0.9rem' }}>Prepared By</span>
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ 
+                                    <div style={{
                                         borderTop: '1px solid #64748b',
                                         width: '150px',
                                         marginTop: '2.5rem',
@@ -1427,13 +1422,13 @@ const PlanningEntry = () => {
                         width: '500px', maxWidth: '90%', maxHeight: '80vh', overflowY: 'auto'
                     }}>
                         <h3 style={{ marginBottom: '1rem', color: '#1F2937' }}>Edit Planning Entry</h3>
-                        
+
                         <div style={{ display: 'grid', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: '500' }}>Plan Date</label>
                                 <DatePicker
                                     value={editingRecord.planDate}
-                                    onChange={(e) => setEditingRecord({...editingRecord, planDate: e.target.value})}
+                                    onChange={(e) => setEditingRecord({ ...editingRecord, planDate: e.target.value })}
                                     placeholder="Select date..."
                                 />
                             </div>
@@ -1443,7 +1438,7 @@ const PlanningEntry = () => {
                                     <input
                                         type="number"
                                         value={editingRecord.productionQty}
-                                        onChange={(e) => setEditingRecord({...editingRecord, productionQty: e.target.value})}
+                                        onChange={(e) => setEditingRecord({ ...editingRecord, productionQty: e.target.value })}
                                         className="input-field"
                                         style={{ width: '100%' }}
                                     />
@@ -1453,7 +1448,7 @@ const PlanningEntry = () => {
                                     <input
                                         type="number"
                                         value={editingRecord.plateQty}
-                                        onChange={(e) => setEditingRecord({...editingRecord, plateQty: e.target.value})}
+                                        onChange={(e) => setEditingRecord({ ...editingRecord, plateQty: e.target.value })}
                                         className="input-field"
                                         style={{ width: '100%' }}
                                     />
@@ -1464,7 +1459,7 @@ const PlanningEntry = () => {
                                     <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: '500' }}>Shift</label>
                                     <select
                                         value={editingRecord.shift}
-                                        onChange={(e) => setEditingRecord({...editingRecord, shift: e.target.value})}
+                                        onChange={(e) => setEditingRecord({ ...editingRecord, shift: e.target.value })}
                                         className="input-field"
                                         style={{ width: '100%' }}
                                     >
@@ -1478,7 +1473,7 @@ const PlanningEntry = () => {
                                     <input
                                         type="text"
                                         value={editingRecord.mouldBoxSize}
-                                        onChange={(e) => setEditingRecord({...editingRecord, mouldBoxSize: e.target.value})}
+                                        onChange={(e) => setEditingRecord({ ...editingRecord, mouldBoxSize: e.target.value })}
                                         className="input-field"
                                         style={{ width: '100%' }}
                                     />

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../api';
 import TableSkeleton from '../common/TableSkeleton';
 import TextTooltip from '../common/TextTooltip';
+import { formatDate } from '../../styles/sharedStyles';
 
 const UnifiedRecordsTable = ({ searchQuery, refreshTrigger, onRowClick, selectedId }) => {
     const [expandedRows, setExpandedRows] = useState(new Set());
@@ -59,13 +60,6 @@ const UnifiedRecordsTable = ({ searchQuery, refreshTrigger, onRowClick, selected
             }
         }
     }, [expandedRows]);
-
-    // Format date helper - DD/MM/YYYY format
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
-    };
 
     // Render expanded content (parts and sleeves sub-tables)
     const renderExpandedContent = (patternId) => {
@@ -262,8 +256,10 @@ const UnifiedRecordsTable = ({ searchQuery, refreshTrigger, onRowClick, selected
                                 {/* Expand Button */}
                                 <th style={{ ...headerCellStyle, width: '40px', textAlign: 'center' }}></th>
                                 
+                                {/* Sr. No */}
+                                <th style={{ ...headerCellStyle, textAlign: 'center' }}>Sr. No</th>
+                                
                                 {/* Basic Info */}
-                                <th style={headerCellStyle}>ID</th>
                                 <th style={headerCellStyle}>Pattern No</th>
                                 <th style={headerCellStyle}>Customer</th>
                                 <th style={headerCellStyle}>Serial No</th>
@@ -349,7 +345,7 @@ const UnifiedRecordsTable = ({ searchQuery, refreshTrigger, onRowClick, selected
                                     </td>
                                 </tr>
                             ) : (
-                                patterns.map((pattern) => (
+                                patterns.map((pattern, index) => (
                                     <React.Fragment key={pattern.PatternId}>
                                         <tr
                                             onClick={() => onRowClick && onRowClick(pattern)}
@@ -388,8 +384,10 @@ const UnifiedRecordsTable = ({ searchQuery, refreshTrigger, onRowClick, selected
                                                 </button>
                                             </td>
                                             
+                                            {/* Sr. No */}
+                                            <td style={{ ...cellStyle, textAlign: 'center', fontWeight: '500' }}>{index + 1}</td>
+                                            
                                             {/* Basic Info */}
-                                            <td style={cellStyle}>{pattern.PatternId}</td>
                                             <td style={{ ...cellStyle, fontWeight: '500' }}>{pattern.PatternNo}</td>
                                             <td style={cellStyle}><TextTooltip text={pattern.CustomerName} maxLength={20} /></td>
                                             <td style={cellStyle}>{pattern.Serial_No || '-'}</td>

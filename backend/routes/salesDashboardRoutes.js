@@ -11,8 +11,8 @@ const { parseDateRange, buildMonthsInRange, buildMonthConditions } = require('..
 // Frontend handles all aggregation client-side
 // =============================================
 
-// GET /sales-dashboard/data - Complete sales data grouped by customer, segment, and month (cached 2 min)
-router.get('/data', cacheMiddleware('sales-data', 120), async (req, res) => {
+// GET /sales-dashboard/data - Complete sales data grouped by customer, segment, and month (cached 5 min)
+router.get('/data', cacheMiddleware('sales-data', 300), async (req, res) => {
     try {
         const { fromDate, toDate } = req.query;
         

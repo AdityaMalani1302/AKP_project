@@ -5,33 +5,63 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useDebounce } from '../utils/useDebounce';
 import { useFormShortcuts } from '../utils/useKeyboardShortcuts';
-import useAutoSave, { DraftRecoveryBanner, AutoSaveIndicator } from '../utils/useAutoSave';
+import useAutoSave from '../utils/useAutoSave'; // Keeping useAutoSave hook
 import { validatePatternMaster } from '../utils/validation';
-import MainDetails from './pattern-master/MainDetails';
-import PatternSection from './pattern-master/PatternSection';
-import CoreBoxSection from './pattern-master/CoreBoxSection';
-import CoreDetailsSection from './pattern-master/CoreDetailsSection';
-import ChapletsChillsSection from './pattern-master/ChapletsChillsSection';
-import MouldingSection from './pattern-master/MouldingSection';
-import CastingSection from './pattern-master/CastingSection';
-import SleevesSection from './pattern-master/SleevesSection';
+
+import PatternForm from './pattern-master/PatternForm'; // New Import
 import UnifiedRecordsTable from './pattern-master/UnifiedRecordsTable';
 import PatternReturnSection from './pattern-master/PatternReturnSection';
 import PatternHistoryTab from './pattern-master/PatternHistoryTab';
 
-import AdditionalSection from './pattern-master/AdditionalSection';
+import AlertDialog from './common/AlertDialog';
 import AlertDialog from './common/AlertDialog';
 import TableSkeleton from './common/TableSkeleton';
 import TextTooltip from './common/TextTooltip';
 import Combobox from './common/Combobox';
 import AnimatedTabs from './common/AnimatedTabs';
 
-const PatternMaster = () => {
+const PatternMaster = ({ user }) => {
     // Tab state with URL persistence
     const [searchParams, setSearchParams] = useSearchParams();
     
-    // Read tab from URL, default to 'master'
-    const activeTab = searchParams.get('tab') || 'master';
+    // Define tabs with their permission IDs
+    const allTabs = [
+        { id: 'master', label: 'Pattern Master', pageId: 'pattern-master' },
+        { id: 'history', label: 'Pattern-Process Card', pageId: 'pattern-process-card' },
+        { id: 'return', label: 'Pattern Return History', pageId: 'pattern-return-history' }
+    ];
+
+    // Filter tabs based on permissions
+    const getVisibleTabs = () => {
+        if (!user) return allTabs;
+        
+        // Admins see all tabs
+        if (user.role === 'admin') return allTabs;
+        
+        const allowedPages = user.allowedPages || [];
+        
+        // If user has 'all' access, show all tabs
+        if (allowedPages.includes('all')) return allTabs;
+        
+        // Check if user has ANY sub-tab permissions explicitly assigned
+        const hasSpecificSubTabs = allTabs.some(tab => 
+            tab.pageId !== 'pattern-master' && allowedPages.includes(tab.pageId)
+        );
+        
+        if (!hasSpecificSubTabs) {
+             // If no specific sub-tabs are assigned, only show the main Pattern Master tab
+             return allTabs.filter(tab => tab.pageId === 'pattern-master');
+        }
+
+        // Return only allowed tabs
+        return allTabs.filter(tab => allowedPages.includes(tab.pageId));
+    };
+
+    const tabs = getVisibleTabs();
+    
+    // Read tab from URL, default to first visible tab
+    const urlTab = searchParams.get('tab');
+    const activeTab = (urlTab && tabs.some(t => t.id === urlTab)) ? urlTab : (tabs[0]?.id || 'master');
     
     // Handler to change tab and update URL
     const setActiveTab = useCallback((tab) => {
@@ -281,6 +311,7 @@ const PatternMaster = () => {
         onSuccess: (data) => {
             toast.success(`Pattern added successfully! Pattern ID: ${data.data.patternId}`);
             queryClient.invalidateQueries(['patterns']);
+            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
             setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
@@ -311,6 +342,7 @@ const PatternMaster = () => {
         onSuccess: () => {
             toast.success('Pattern deleted successfully!');
             queryClient.invalidateQueries(['patterns']);
+            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
             setRefreshTrigger(prev => prev + 1);
             handleClear(); // Reset all form fields after deletion
             setShowDeleteDialog(false);
@@ -857,10 +889,7 @@ const PatternMaster = () => {
 
             {/* Tab Navigation */}
             <AnimatedTabs
-                tabs={[
-                    { id: 'master', label: 'Pattern Master' },
-                    { id: 'history', label: 'Pattern History' }
-                ]}
+                tabs={tabs}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
             />
@@ -868,128 +897,60 @@ const PatternMaster = () => {
             {/* Tab Content */}
             {activeTab === 'master' ? (
                 <>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
-
-                {/* Draft Recovery Banner */}
-                {hasDraft && !isEditing && (
-                    <DraftRecoveryBanner
-                        onRecover={handleRecoverDraft}
-                        onDiscard={clearDraft}
-                        lastSavedText={getLastSavedText()}
-                    />
-                )}
-
-                {/* Auto-save indicator */}
-                {!isEditing && !hasDraft && getLastSavedText() && (
-                    <div style={{ marginBottom: '0.5rem' }}>
-                        <AutoSaveIndicator lastSavedText={getLastSavedText()} />
-                    </div>
-                )}
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    <MainDetails
-                        data={mainData}
-                        onChange={handleMainChange}
-                        partRows={partRows}
-                        onPartRowChange={handlePartRowChange}
-                        onAddPartRow={addPartRow}
-                        onRemovePartRow={removePartRow}
-                        errors={errors}
-                    />
-
-                    <PatternSection
-                        data={patternData}
-                        onChange={handlePatternChange}
-                        errors={errors}
-                    />
-
-                    <CoreBoxSection
-                        data={coreBoxData}
-                        onChange={handleCoreBoxChange}
-                        errors={errors}
-                    />
-
-                    <CoreDetailsSection
-                        data={coreDetailsData}
-                        onChange={handleCoreDetailsChange}
-                        errors={errors}
-                    />
-
-                    <CastingSection
-                        data={castingData}
-                        onChange={handleCastingChange}
-                        errors={errors}
-                    />
-
-                    <MouldingSection
-                        data={mouldingData}
-                        onChange={handleMouldingChange}
-                    />
-
-                    <ChapletsChillsSection
-                        data={chapletsChillsData}
-                        onChange={handleChapletsChillsChange}
-                    />
-
-                    <SleevesSection
-                        sleeveRows={sleeveRows}
-                        onSleeveRowChange={handleSleeveRowChange}
-                        onAddSleeveRow={addSleeveRow}
-                        onRemoveSleeveRow={removeSleeveRow}
-                        sleeveOptions={sleeveOptions}
-                        errors={errors}
-                    />
-
-                    <AdditionalSection
-                        data={additionalData}
-                        onChange={handleAdditionalChange}
-                    />
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
-                    <button type="submit" disabled={loading} className="btn btn-primary">
-                        {loading ? 'Saving...' : (isEditing ? 'UPDATE' : 'ADD')}
-                    </button>
-                    {selectedId && (
-                        <button type="button" onClick={handleDeleteClick} className="btn" style={{ backgroundColor: '#EF4444', color: 'white' }}>
-                            DELETE
-                        </button>
-                    )}
-                    <button type="button" onClick={handleClear} className="btn btn-secondary">
-                        CLEAR
-                    </button>
-
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <label style={{ fontWeight: '500', whiteSpace: 'nowrap', color: '#374151' }}>Search:</label>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            placeholder="Type to search..."
-                            className="input-field"
-                            style={{ minWidth: '200px' }}
-                        />
-                        {searchTerm && (
-                            <button type="button" onClick={() => setSearchTerm('')} className="btn btn-secondary" style={{ padding: '0.5rem 0.75rem' }}>✕</button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Error Message Display */}
-                {error && (
-                    <div style={{
-                        marginTop: '1rem',
-                        padding: '0.75rem',
-                        backgroundColor: '#FEE2E2',
-                        color: '#DC2626',
-                        borderRadius: '6px',
-                        border: '1px solid #FCA5A5'
-                    }}>
-                        {error}
-                    </div>
-                )}
-            </form>
+                <PatternForm
+                    // Data
+                    mainData={mainData}
+                    patternData={patternData}
+                    coreBoxData={coreBoxData}
+                    coreDetailsData={coreDetailsData}
+                    castingData={castingData}
+                    mouldingData={mouldingData}
+                    chapletsChillsData={chapletsChillsData}
+                    sleeveRows={sleeveRows}
+                    additionalData={additionalData}
+                    partRows={partRows}
+                    sleeveOptions={sleeveOptions}
+                    
+                    // Handlers
+                    onMainChange={handleMainChange}
+                    onPatternChange={handlePatternChange}
+                    onCoreBoxChange={handleCoreBoxChange}
+                    onCoreDetailsChange={handleCoreDetailsChange}
+                    onCastingChange={handleCastingChange}
+                    onMouldingChange={handleMouldingChange}
+                    onChapletsChillsChange={handleChapletsChillsChange}
+                    onAdditionalChange={handleAdditionalChange}
+                    
+                    // Array Handlers
+                    onPartRowChange={handlePartRowChange}
+                    onAddPartRow={addPartRow}
+                    onRemovePartRow={removePartRow}
+                    onSleeveRowChange={handleSleeveRowChange}
+                    onAddSleeveRow={addSleeveRow}
+                    onRemoveSleeveRow={removeSleeveRow}
+                    
+                    // Actions
+                    onSubmit={handleSubmit}
+                    onClear={handleClear}
+                    onDelete={handleDeleteClick}
+                    
+                    // Search
+                    searchTerm={searchTerm}
+                    onSearchChange={handleSearchChange}
+                    
+                    // State
+                    errors={errors}
+                    loading={loading}
+                    isEditing={isEditing}
+                    selectedId={selectedId}
+                    error={error}
+                    
+                    // AutoSave
+                    hasDraft={hasDraft}
+                    onRecoverDraft={handleRecoverDraft}
+                    onDiscardDraft={clearDraft}
+                    lastSavedText={getLastSavedText()}
+                />
 
             {/* Unified Records Table - Shows patterns with expandable parts/sleeves */}
             <UnifiedRecordsTable 
@@ -998,12 +959,11 @@ const PatternMaster = () => {
                 onRowClick={handleRowClick}
                 selectedId={selectedId}
             />
-
-            {/* Pattern Return History Section */}
-            <PatternReturnSection />
             </>
-            ) : (
+            ) : activeTab === 'history' ? (
                 <PatternHistoryTab />
+            ) : (
+                <PatternReturnSection />
             )}
 
             <AlertDialog

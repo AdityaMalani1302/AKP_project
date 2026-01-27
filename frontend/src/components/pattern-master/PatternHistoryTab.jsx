@@ -275,7 +275,7 @@ const PatternHistoryTab = () => {
 
     return (
         <div>
-            <div style={{ marginBottom: '2rem' }}>
+            <div style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                     Search & Select Pattern No:
                 </label>

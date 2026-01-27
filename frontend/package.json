@@ -20,6 +20,9 @@
     "chart.js": "^4.5.1",
     "chartjs-plugin-datalabels": "^2.2.0",
     "cmdk": "^1.1.1",
+    "d3-drag": "^3.0.0",
+    "d3-geo": "^3.1.1",
+    "d3-selection": "^3.0.0",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
@@ -37,6 +40,7 @@
     "react-router-dom": "^7.1.1",
     "react-select": "^5.10.2",
     "sonner": "^2.0.7",
+    "topojson-client": "^3.1.0",
     "use-react-router-breadcrumbs": "^4.0.1"
   },
   "devDependencies": {

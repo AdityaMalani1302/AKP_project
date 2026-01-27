@@ -10,8 +10,8 @@ const { parseDateRange, buildMonthsInRange, buildMonthConditions } = require('..
 // Uses MeltingDashboard and ProductionDashboard views
 // =============================================
 
-// GET /production-dashboard/melting-data - Melting dashboard data (cached 2 min)
-router.get('/melting-data', cacheMiddleware('production-melting', 120), async (req, res) => {
+// GET /production-dashboard/melting-data - Melting dashboard data (cached 5 min)
+router.get('/melting-data', cacheMiddleware('production-melting', 300), async (req, res) => {
     try {
         const { fromDate, toDate } = req.query;
 
@@ -51,8 +51,8 @@ router.get('/melting-data', cacheMiddleware('production-melting', 120), async (r
     }
 });
 
-// GET /production-dashboard/production-data - Production dashboard data (cached 2 min)
-router.get('/production-data', cacheMiddleware('production-data', 120), async (req, res) => {
+// GET /production-dashboard/production-data - Production dashboard data (cached 5 min)
+router.get('/production-data', cacheMiddleware('production-data', 300), async (req, res) => {
     try {
         const { fromDate, toDate } = req.query;
 

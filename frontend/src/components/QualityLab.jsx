@@ -30,9 +30,9 @@ const QualityLab = ({ user }) => {
         // If user has 'all' access, show all tabs
         if (allowedPages.includes('all')) return allTabs;
         
-        // If no specific sub-tabs are assigned, show all tabs (backward compatibility)
+        // If no specific sub-tabs are assigned, show no tabs (user has parent access but no sub-tab access)
         const hasAnySubTab = allTabs.some(tab => allowedPages.includes(tab.pageId));
-        if (!hasAnySubTab) return allTabs;
+        if (!hasAnySubTab) return [];
         
         // Filter to only allowed tabs
         return allTabs.filter(tab => allowedPages.includes(tab.pageId));

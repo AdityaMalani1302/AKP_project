@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, getPool } = require('../config/db');
+const { cacheMiddleware } = require('../utils/cache');
 
 // =============================================
 // AR Dashboard API Routes
@@ -8,8 +9,8 @@ const { sql, getPool } = require('../config/db');
 // Uses AccountReceivables view from IcSoftVer3 database
 // =============================================
 
-// GET /ar-dashboard/data - Complete AR data from AccountReceivables view
-router.get('/data', async (req, res) => {
+// GET /ar-dashboard/data - Complete AR data from AccountReceivables view (cached 5 min)
+router.get('/data', cacheMiddleware('ar-data', 300), async (req, res) => {
     try {
         console.log('[AR Dashboard] Fetching AccountReceivables data');
 
@@ -45,8 +46,8 @@ router.get('/data', async (req, res) => {
     }
 });
 
-// GET /ar-dashboard/recovery - Recovery data from CustomerRecovery view
-router.get('/recovery', async (req, res) => {
+// GET /ar-dashboard/recovery - Recovery data from CustomerRecovery view (cached 5 min)
+router.get('/recovery', cacheMiddleware('ar-recovery', 300), async (req, res) => {
     try {
         const { fromDate, toDate } = req.query;
         console.log('[AR Dashboard] Fetching CustomerRecovery data', { fromDate, toDate });

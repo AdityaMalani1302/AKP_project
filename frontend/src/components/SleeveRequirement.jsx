@@ -5,6 +5,7 @@ import api from '../api';
 import '../App.css';
 import TableSkeleton from './common/TableSkeleton';
 import DatePicker from './common/DatePicker';
+import { formatDate } from '../styles/sharedStyles';
 
 const SleeveRequirement = () => {
     const queryClient = useQueryClient();
@@ -136,13 +137,6 @@ const SleeveRequirement = () => {
         setCurrentStep('selection');
         setSleeveData([]);
         setSelectedRows(new Set());
-    };
-
-    // Format date for display
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
     };
 
     // Handle Preview and Print
@@ -563,7 +557,7 @@ const SleeveRequirement = () => {
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                                 <tr>
-                                    <th style={recordThStyle}>ID</th>
+                                    <th style={recordThStyle}>Sr. No</th>
                                     <th style={recordThStyle}>Plan Date</th>
                                     <th style={recordThStyle}>Shift</th>
                                     <th style={recordThStyle}>Pattern No</th>
@@ -574,7 +568,7 @@ const SleeveRequirement = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredRecords.map((record) => (
+                                {filteredRecords.map((record, index) => (
                                     <tr
                                         key={record.Id}
                                         style={{
@@ -584,7 +578,7 @@ const SleeveRequirement = () => {
                                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F0FDF4'}
                                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                     >
-                                        <td style={recordTdStyle}>{record.Id}</td>
+                                        <td style={recordTdStyle}>{index + 1}</td>
                                         <td style={recordTdStyle}>{formatDate(record.PlanDate)}</td>
                                         <td style={recordTdStyle}>{record.Shift}</td>
                                         <td style={{ ...recordTdStyle, fontWeight: '600', color: '#2563EB' }}>{record.PatternNo}</td>

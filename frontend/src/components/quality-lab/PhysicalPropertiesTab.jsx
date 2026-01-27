@@ -302,13 +302,13 @@ const PhysicalPropertiesTab = () => {
                 </h3>
 
                 {isLoading ? (
-                    <TableSkeleton rows={8} columns={8} />
+                    <TableSkeleton rows={8} columns={9} />
                 ) : (
                     <div style={{ overflowX: 'auto', maxHeight: '400px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                                 <tr>
-                                    <th style={tableHeaderStyle}>ID</th>
+                                    <th style={tableHeaderStyle}>Sr. No</th>
                                     <th style={tableHeaderStyle}>Date</th>
                                     <th style={tableHeaderStyle}>Heat No</th>
                                     <th style={tableHeaderStyle}>Grade</th>
@@ -325,12 +325,12 @@ const PhysicalPropertiesTab = () => {
                                         <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>No records found</td>
                                     </tr>
                                 ) : (
-                                    records.map(record => (
+                                    records.map((record, index) => (
                                         <tr key={record.Id} onClick={() => handleRowClick(record)}
                                             style={{ cursor: 'pointer', backgroundColor: selectedId === record.Id ? '#DBEAFE' : 'white', transition: 'background-color 0.15s' }}
                                             onMouseEnter={(e) => { if (selectedId !== record.Id) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
                                             onMouseLeave={(e) => { if (selectedId !== record.Id) e.currentTarget.style.backgroundColor = 'white'; }}>
-                                            <td style={tableCellStyle}>{record.Id}</td>
+                                            <td style={tableCellStyle}>{index + 1}</td>
                                             <td style={tableCellStyle}>{formatDate(record.Date)}</td>
                                             <td style={tableCellStyle}>{record.HeatNo}</td>
                                             <td style={tableCellStyle}>{record.Grade}</td>

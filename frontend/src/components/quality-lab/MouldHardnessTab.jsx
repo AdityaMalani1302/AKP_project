@@ -232,7 +232,7 @@ const MouldHardnessTab = () => {
                         <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                                 <tr>
-                                    <th style={tableHeaderStyle}>ID</th>
+                                    <th style={tableHeaderStyle}>Sr. No</th>
                                     <th style={tableHeaderStyle}>Date</th>
                                     <th style={tableHeaderStyle}>Heat No</th>
                                     <th style={tableHeaderStyle}>Part No</th>
@@ -244,12 +244,12 @@ const MouldHardnessTab = () => {
                             <tbody>
                                 {records.length === 0 ? (
                                     <tr><td colSpan={29} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>No records found</td></tr>
-                                ) : records.map(record => (
+                                ) : records.map((record, index) => (
                                     <tr key={record.Id} onClick={() => handleRowClick(record)}
                                         style={{ cursor: 'pointer', backgroundColor: selectedId === record.Id ? '#E2E8F0' : 'white', transition: 'background-color 0.15s' }}
                                         onMouseEnter={(e) => { if (selectedId !== record.Id) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
                                         onMouseLeave={(e) => { if (selectedId !== record.Id) e.currentTarget.style.backgroundColor = 'white'; }}>
-                                        <td style={tableCellStyle}>{record.Id}</td>
+                                        <td style={tableCellStyle}>{index + 1}</td>
                                         <td style={tableCellStyle}>{formatDate(record.Date)}</td>
                                         <td style={tableCellStyle}>{record.HeatNo}</td>
                                         <td style={tableCellStyle}>{record.PartNo}</td>

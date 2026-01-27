@@ -44,7 +44,8 @@ const verifyToken = async (req, res, next) => {
 
         next();
     } catch (err) {
-        console.error('Auth Middleware Error:', err.message);
+        const logger = require('../utils/logger');
+        logger.error('Auth Middleware Error:', err); // Log full error object for stack trace
         res.status(401).json({ error: 'Invalid or expired token' });
     }
 };

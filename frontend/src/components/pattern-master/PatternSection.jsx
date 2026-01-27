@@ -93,10 +93,15 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
                     >
                         <option value="">Select Pattern Set</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
-                        <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="2 Sets (Top-Bottom) = 4 No's">2 Set (Top-Bottom) = 4 No's</option>
                         <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
                         <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
                         <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
+                        <option value="6 Set (Top-Bottom) = 12 No's">6 Set (Top-Bottom) = 12 No's</option>
+                        <option value="7 Set (Top-Bottom) = 14 No's">7 Set (Top-Bottom) = 14 No's</option>
+                        <option value="8 Set (Top-Bottom) = 16 No's">8 Set (Top-Bottom) = 16 No's</option>
+                        <option value="9 Set (Top-Bottom) = 18 No's">9 Set (Top-Bottom) = 18 No's</option>
+                        <option value="10 Set (Top-Bottom) = 20 No's">10 Set (Top-Bottom) = 20 No's</option>
                     </select>
                 </div>
 
