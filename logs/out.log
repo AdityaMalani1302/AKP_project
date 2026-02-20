@@ -1,0 +1,10 @@
+2026-02-05 11:36:09 +05:30: [dotenv@17.2.3] injecting env (10) from .env -- tip: ⚙️  override existing env vars with { override: true }
+2026-02-05 11:36:10 +05:30: [dotenv@17.2.3] injecting env (0) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-02-05 11:36:10 +05:30: [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+2026-02-05 11:36:11 +05:30: [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+2026-02-05 11:36:12 +05:30: Connected to SQL Server Database: IcSoftVer3
+2026-02-05 11:36:12 +05:30: Connected to SQL Server Database: IcSoftReportVer3
+2026-02-05 11:36:12 +05:30: Connected to SQL Server Database: IcSoftLedgerVer3
+2026-02-05 11:36:15 +05:30: [Scheduler] Initializing scheduler service...
+2026-02-05 11:36:17 +05:30: [Scheduler] Found 0 active schedule(s)
+2026-02-05 11:36:17 +05:30: [Scheduler] Scheduler service initialized

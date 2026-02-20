@@ -1,6 +1,7 @@
 import React from 'react';
-import { FiSearch, FiBell, FiUser, FiMenu } from 'react-icons/fi';
-import DatabaseSelector from '../DatabaseSelector';
+
+import { FiMenu } from 'react-icons/fi';
+import NotificationBell from '../common/NotificationBell';
 
 const Header = ({ user, onMenuClick }) => {
     return (
@@ -19,9 +20,9 @@ const Header = ({ user, onMenuClick }) => {
             }}
             role="banner"
         >
-            {/* Left Section - Hamburger + Title */}
+            {/* Left Section - Sidebar Toggle + Title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {/* Hamburger Menu - Mobile Only */}
+                {/* Sidebar Toggle Button */}
                 <button
                     onClick={onMenuClick}
                     style={{
@@ -31,71 +32,26 @@ const Header = ({ user, onMenuClick }) => {
                         cursor: 'pointer',
                         color: '#6B7280',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        borderRadius: '0.375rem',
+                        transition: 'background-color 0.2s'
                     }}
-                    className="mobile-menu-button"
-                    aria-label="Open navigation menu"
-                    aria-expanded="false"
+                    className="sidebar-toggle-button"
+                    aria-label="Toggle sidebar"
                 >
                     <FiMenu size={24} />
                 </button>
 
                 <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
-                    Dashboard
+                    AKP FOUNDRIES PVT LTD
                 </h2>
             </div>
 
             {/* Right Section */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div className="desktop-only">
-                    <DatabaseSelector />
-                </div>
-
-                {/* Search - Desktop Only */}
-                <div className="desktop-only" style={{ position: 'relative' }}>
-                    <label htmlFor="global-search" className="sr-only">Search</label>
-                    <FiSearch
-                        style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}
-                        aria-hidden="true"
-                    />
-                    <input
-                        id="global-search"
-                        type="text"
-                        placeholder="Search..."
-                        style={{
-                            padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                            borderRadius: '0.375rem',
-                            border: '1px solid #E5E7EB',
-                            outline: 'none',
-                            fontSize: '0.875rem',
-                            width: '240px',
-                            backgroundColor: '#F9FAFB'
-                        }}
-                        aria-label="Global search"
-                    />
-                </div>
-
-                {/* Notifications - Desktop Only */}
-                <button
-                    className="desktop-only"
-                    style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}
-                    aria-label="Notifications (1 unread)"
-                >
-                    <FiBell size={20} />
-                    <span
-                        style={{
-                            position: 'absolute',
-                            top: '-2px',
-                            right: '-2px',
-                            width: '8px',
-                            height: '8px',
-                            backgroundColor: '#EF4444',
-                            borderRadius: '50%'
-                        }}
-                        aria-hidden="true"
-                    ></span>
-                </button>
-
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {/* Notification Bell */}
+                <NotificationBell />
+                
                 {/* User Profile */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }} role="complementary" aria-label="User information">
                     <div
@@ -123,10 +79,8 @@ const Header = ({ user, onMenuClick }) => {
             </div>
 
             <style>{`
-                @media (min-width: 768px) {
-                    .mobile-menu-button {
-                        display: none !important;
-                    }
+                .sidebar-toggle-button:hover {
+                    background-color: #F3F4F6;
                 }
                 @media (max-width: 767px) {
                     .desktop-only {

@@ -1,26 +1,85 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useDebounce } from '../utils/useDebounce';
+import { useFormShortcuts } from '../utils/useKeyboardShortcuts';
 import { validatePatternMaster } from '../utils/validation';
-import MainDetails from './pattern-master/MainDetails';
-import PatternSection from './pattern-master/PatternSection';
-import CoreBoxSection from './pattern-master/CoreBoxSection';
-import CoreDetailsSection from './pattern-master/CoreDetailsSection';
-import ChapletsChillsSection from './pattern-master/ChapletsChillsSection';
-import MouldingSection from './pattern-master/MouldingSection';
-import CastingSection from './pattern-master/CastingSection';
-import SleevesSection from './pattern-master/SleevesSection';
-import AdditionalSection from './pattern-master/AdditionalSection';
-// import * as Tabs from '@radix-ui/react-tabs'; // Removed
-// import './PatternMasterTabs.css'; // Removed
-import AlertDialog from './common/AlertDialog';
-import { createColumnHelper } from '@tanstack/react-table';
-import DataTable from './common/DataTable';
-import TableSkeleton from './common/TableSkeleton'; // Added
-import TextTooltip from './common/TextTooltip'; // Added
 
-const PatternMaster = () => {
+import PatternForm from './pattern-master/PatternForm'; // New Import
+import UnifiedRecordsTable from './pattern-master/UnifiedRecordsTable';
+import PatternReturnSection from './pattern-master/PatternReturnSection';
+import PatternHistoryTab from './pattern-master/PatternHistoryTab';
+
+import AlertDialog from './common/AlertDialog';
+import TableSkeleton from './common/TableSkeleton';
+import TextTooltip from './common/TextTooltip';
+import Combobox from './common/Combobox';
+import AnimatedTabs from './common/AnimatedTabs';
+
+const PatternMaster = ({ user }) => {
+    // Tab state with URL persistence
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Define tabs with their permission IDs
+    const allTabs = [
+        { id: 'master', label: 'Pattern Master', pageId: 'pattern-master' },
+        { id: 'history', label: 'Pattern-Process Card', pageId: 'pattern-process-card' },
+        { id: 'return', label: 'Pattern Return History', pageId: 'pattern-return-history' }
+    ];
+
+    // Filter tabs based on permissions
+    const getVisibleTabs = () => {
+        if (!user) return allTabs;
+
+        // Admins see all tabs
+        if (user.role === 'admin') return allTabs;
+
+        const allowedPages = user.allowedPages || [];
+
+        // If user has 'all' access, show all tabs
+        if (allowedPages.includes('all')) return allTabs;
+
+        // Check if user has ANY sub-tab permissions explicitly assigned
+        const hasSpecificSubTabs = allTabs.some(tab =>
+            tab.pageId !== 'pattern-master' && allowedPages.includes(tab.pageId)
+        );
+
+        if (!hasSpecificSubTabs) {
+            // If no specific sub-tabs are assigned, only show the main Pattern Master tab
+            return allTabs.filter(tab => tab.pageId === 'pattern-master');
+        }
+
+        // Return only allowed tabs
+        return allTabs.filter(tab => allowedPages.includes(tab.pageId));
+    };
+
+    const tabs = getVisibleTabs();
+
+    // Read tab from URL, default to first visible tab
+    const urlTab = searchParams.get('tab');
+    const activeTab = (urlTab && tabs.some(t => t.id === urlTab)) ? urlTab : (tabs[0]?.id || 'master');
+
+    // Handler to change tab and update URL
+    const setActiveTab = useCallback((tab) => {
+        setSearchParams(prev => {
+            prev.set('tab', tab);
+            return prev;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    // Fetch pattern stats for header card
+    const { data: patternStats, isLoading: statsLoading } = useQuery({
+        queryKey: ['pattern-master', 'stats'],
+        queryFn: async () => {
+            const res = await api.get('/pattern-master/stats');
+            return res.data;
+        },
+        staleTime: 60000, // 1 minute
+        refetchInterval: 60000 // Auto-refresh every 1 minute
+    });
+
     // Split State for Performance
     const [mainData, setMainData] = useState({
         PatternNo: '',
@@ -32,7 +91,8 @@ const PatternMaster = () => {
         Customer_Po_No: '',
         Tooling_PO_Date: '',
         Purchase_No: '',
-        Purchase_Date: ''
+        Purchase_Date: '',
+        Pattern_Received_Date: ''
     });
 
     const [patternData, setPatternData] = useState({
@@ -41,7 +101,8 @@ const PatternMaster = () => {
         Pattern_Material_Details: '',
         No_Of_Patterns_Set: '',
         Pattern_Pieces: '',
-        Rack_Location: ''
+        Rack_Location: '',
+        Box_Per_Heat: ''
     });
 
     const [coreBoxData, setCoreBoxData] = useState({
@@ -107,6 +168,7 @@ const PatternMaster = () => {
         {
             sleeve_name: '',
             sleeve_type_size: '',
+            sleeve_type_size_name: '',
             quantity: ''
         }
     ]);
@@ -128,7 +190,9 @@ const PatternMaster = () => {
     const [selectedId, setSelectedId] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchQuery, setSearchQuery] = useState(''); // The active query for the API
+    // Debounced search - auto-search 300ms after typing stops
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger for sub-tables refresh
 
     // Dynamic parts rows state
     const [partRows, setPartRows] = useState([
@@ -137,6 +201,23 @@ const PatternMaster = () => {
 
     // Sleeve options state
     const [sleeveOptions, setSleeveOptions] = useState([]);
+
+    // Pattern numbers for Edit dropdown
+    const [patternNumbers, setPatternNumbers] = useState([]);
+
+
+
+    // Keyboard shortcuts for power users
+    useFormShortcuts({
+        onSave: () => {
+            // Trigger form submit programmatically
+            const form = document.querySelector('form');
+            if (form) form.requestSubmit();
+        },
+        onCancel: () => handleClear(),
+        onNew: () => handleClear(),
+        enabled: true
+    });
 
     // Fetch sleeves on mount
     useEffect(() => {
@@ -156,6 +237,23 @@ const PatternMaster = () => {
         fetchSleeves();
     }, []);
 
+    // Fetch pattern numbers for Edit dropdown
+    useEffect(() => {
+        const fetchPatternNumbers = async () => {
+            try {
+                const response = await api.get('/pattern-master/numbers');
+                const formatted = response.data.map(p => ({
+                    value: p.PatternId,
+                    label: p.PatternNo || `Pattern ${p.PatternId}`
+                }));
+                setPatternNumbers(formatted);
+            } catch (error) {
+                console.error('Error fetching pattern numbers:', error);
+            }
+        };
+        fetchPatternNumbers();
+    }, [refreshTrigger]);
+
     // React Query for fetching patterns
     const fetchPatternsFromApi = async (query) => {
         const url = query
@@ -168,10 +266,9 @@ const PatternMaster = () => {
     const queryClient = useQueryClient();
 
     const { data: patterns = [], isError: isQueryError, isLoading: isQueryLoading } = useQuery({
-        queryKey: ['patterns', searchQuery],
-        queryFn: () => fetchPatternsFromApi(searchQuery),
+        queryKey: ['patterns', debouncedSearchTerm],
+        queryFn: () => fetchPatternsFromApi(debouncedSearchTerm),
         placeholderData: keepPreviousData,
-        staleTime: 5000,
     });
 
     // Mutations
@@ -180,6 +277,9 @@ const PatternMaster = () => {
         onSuccess: (data) => {
             toast.success(`Pattern added successfully! Pattern ID: ${data.data.patternId}`);
             queryClient.invalidateQueries(['patterns']);
+            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
+            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
@@ -194,6 +294,9 @@ const PatternMaster = () => {
         onSuccess: (data, variables) => {
             toast.success(`Pattern updated successfully! Pattern ID: ${variables.id}`);
             queryClient.invalidateQueries(['patterns']);
+            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
+            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
@@ -208,8 +311,10 @@ const PatternMaster = () => {
         onSuccess: () => {
             toast.success('Pattern deleted successfully!');
             queryClient.invalidateQueries(['patterns']);
-            setSelectedId(null);
-            setIsEditing(false);
+            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
+            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            setRefreshTrigger(prev => prev + 1);
+            handleClear(); // Reset all form fields after deletion
             setShowDeleteDialog(false);
         },
         onError: (error) => {
@@ -225,162 +330,161 @@ const PatternMaster = () => {
         }
     }, [isQueryError]);
 
-    // Search handlers
-    const handleSearch = () => setSearchQuery(searchTerm);
-
+    // Search is now auto-triggered by debounce
     const handleSearchChange = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        if (value === '') setSearchQuery('');
+        setSearchTerm(e.target.value);
     };
 
-    const handleSearchKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleSearch();
-        }
-    };
-
-    // Row click handler for editing
-    const handleRowClick = async (pattern) => {
-        setSelectedId(pattern.PatternId);
+    // Row click handler for editing - always fetches full pattern details from API
+    const handleRowClick = async (patternOrData) => {
+        const patternId = patternOrData.PatternId;
+        setSelectedId(patternId);
         setIsEditing(true);
-        // Load full pattern details when row is clicked
+
+        // Always fetch full pattern details from API to ensure proper data structure
+        // The unified-data endpoint has a different format that doesn't work for form editing
+        let data;
         try {
-            const response = await api.get(`/pattern-master/${pattern.PatternId}`);
-            const data = response.data;
-
-            // Populate Main Details
-            setMainData({
-                PatternNo: data.PatternNo || '',
-                Customer: data.Customer ? { value: data.Customer, label: data.CustomerName || data.Customer } : null,
-                Serial_No: data.Serial_No || '',
-                Part_No: data.Part_No || '',
-                Product_Name: data.Product_Name || '',
-                Asset_No: data.Asset_No || '',
-                Customer_Po_No: data.Customer_Po_No || '',
-                Tooling_PO_Date: data.Tooling_PO_Date || '',
-                Purchase_No: data.Purchase_No || '',
-                Purchase_Date: data.Purchase_Date || ''
-            });
-
-            // Populate Pattern Details
-            setPatternData({
-                Quoted_Estimated_Weight: data.Quoted_Estimated_Weight || '',
-                Pattern_Maker: data.Pattern_Maker ? { value: data.Pattern_Maker, label: data.Pattern_Maker_Name || data.Pattern_Maker } : null,
-                Pattern_Material_Details: data.Pattern_Material_Details || '',
-                No_Of_Patterns_Set: data.No_Of_Patterns_Set || '',
-                Pattern_Pieces: data.Pattern_Pieces || '',
-                Rack_Location: data.Rack_Location || ''
-            });
-
-            // Populate Core Box Details
-            setCoreBoxData({
-                Core_Box_Material_Details: data.Core_Box_Material_Details || '',
-                Core_Box_Location: data.Core_Box_Location || '',
-                Core_Box_S7_F4_No: data.Core_Box_S7_F4_No || '',
-                Core_Box_S7_F4_Date: data.Core_Box_S7_F4_Date || '',
-                No_Of_Core_Box_Set: data.No_Of_Core_Box_Set || '',
-                Core_Box_Pieces: data.Core_Box_Pieces || ''
-            });
-
-            // Populate Casting Details
-            setCastingData({
-                Casting_Material_Grade: data.Casting_Material_Grade || '',
-                Moulding_Box_Size: data.Moulding_Box_Size || '',
-                Total_Weight: data.Total_Weight || '',
-                No_Of_Cavities: data.No_Of_Cavities || '',
-                Bunch_Wt: data.Bunch_Wt || '',
-                YieldPercent: data.YieldPercent || ''
-            });
-
-            // Populate Core Details - parse Core_Type string back to checkboxes
-            const coreTypeObj = {
-                shell: data.Core_Type?.includes('Shell') || false,
-                coldBox: data.Core_Type?.includes('Cold Box') || false,
-                noBake: data.Core_Type?.includes('No-Bake') || false
-            };
-
-            setCoreDetailsData({
-                Core_Wt: data.Core_Wt || '',
-                Core_Type: coreTypeObj,
-                shell_qty: data.shell_qty || '',
-                coldBox_qty: data.coldBox_qty || '',
-                noBake_qty: data.noBake_qty || '',
-                Main_Core: data.Main_Core === 'Yes' || data.Main_Core === true,
-                Side_Core: data.Side_Core === 'Yes' || data.Side_Core === true,
-                Loose_Core: data.Loose_Core === 'Yes' || data.Loose_Core === true,
-                mainCore_qty: data.mainCore_qty || '',
-                sideCore_qty: data.sideCore_qty || '',
-                looseCore_qty: data.looseCore_qty || ''
-            });
-
-            // Populate Chaplets & Chills
-            setChapletsChillsData({
-                Chaplets_COPE: data.Chaplets_COPE || '',
-                Chaplets_DRAG: data.Chaplets_DRAG || '',
-                Chills_COPE: data.Chills_COPE || '',
-                Chills_DRAG: data.Chills_DRAG || ''
-            });
-
-            // Populate Moulding Details
-            setMouldingData({
-                Mould_Vents_Size: data.Mould_Vents_Size || '',
-                Mould_Vents_No: data.Mould_Vents_No || '',
-                breaker_core_size: data.breaker_core_size || '',
-                down_sprue_size: data.down_sprue_size || '',
-                foam_filter_size: data.foam_filter_size || '',
-                sand_riser_size: data.sand_riser_size || '',
-                no_of_sand_riser: data.no_of_sand_riser || '',
-                ingate_size: data.ingate_size || '',
-                no_of_ingate: data.no_of_ingate || '',
-                runner_bar_size: data.runner_bar_size || '',
-                runner_bar_no: data.runner_bar_no || ''
-            });
-
-            // Populate Additional Info
-            setAdditionalData({
-                rev_no_status: data.rev_no_status || '',
-                date: data.date || '',
-                comment: data.comment || ''
-            });
-
-            // Populate Part Rows
-            if (data.parts && data.parts.length > 0) {
-                const formattedParts = data.parts.map(part => ({
-                    partNoOption: part.partNo ? {
-                        value: part.partNo,
-                        label: part.partNo,
-                        prodName: part.productName || '',
-                        gradeId: part.materialGradeId,
-                        gradeName: part.materialGradeName || ''
-                    } : null,
-                    productName: part.productName || '',
-                    materialGradeId: part.materialGradeId || null,
-                    materialGradeName: part.materialGradeName || '',
-                    qty: part.qty || '',
-                    weight: part.weight || ''
-                }));
-                setPartRows(formattedParts);
-            } else {
-                setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
-            }
-
-            // Populate Sleeve Rows
-            if (data.sleeves && data.sleeves.length > 0) {
-                const formattedSleeves = data.sleeves.map(sleeve => ({
-                    sleeve_name: sleeve.sleeve_name || '',
-                    sleeve_type_size: sleeve.sleeve_type_size || '',
-                    quantity: sleeve.quantity || ''
-                }));
-                setSleeveRows(formattedSleeves);
-            } else {
-                setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
-            }
-
+            const response = await api.get(`/pattern-master/${patternId}`);
+            data = response.data;
         } catch (err) {
             console.error('Error loading pattern details:', err);
             toast.error('Failed to load pattern details for editing');
+            return;
+        }
+
+        // Populate Main Details
+        setMainData({
+            PatternNo: data.PatternNo || '',
+            Customer: data.Customer ? { value: data.Customer, label: data.CustomerName || data.Customer } : null,
+            Serial_No: data.Serial_No || '',
+            Part_No: data.Part_No || '',
+            Product_Name: data.Product_Name || '',
+            Asset_No: data.Asset_No || '',
+            Customer_Po_No: data.Customer_Po_No || '',
+            Tooling_PO_Date: data.Tooling_PO_Date || '',
+            Purchase_No: data.Purchase_No || '',
+            Purchase_Date: data.Purchase_Date || '',
+            Pattern_Received_Date: data.Pattern_Received_Date || ''
+        });
+
+        // Populate Pattern Details
+        setPatternData({
+            Quoted_Estimated_Weight: data.Quoted_Estimated_Weight || '',
+            Pattern_Maker: data.Pattern_Maker ? { value: data.Pattern_Maker, label: data.Pattern_Maker_Name || data.Pattern_Maker } : null,
+            Pattern_Material_Details: data.Pattern_Material_Details || '',
+            No_Of_Patterns_Set: data.No_Of_Patterns_Set || '',
+            Pattern_Pieces: data.Pattern_Pieces || '',
+            Rack_Location: data.Rack_Location || '',
+            Box_Per_Heat: data.Box_Per_Heat || ''
+        });
+
+        // Populate Core Box Details
+        setCoreBoxData({
+            Core_Box_Material_Details: data.Core_Box_Material_Details || '',
+            Core_Box_Location: data.Core_Box_Location || '',
+            Core_Box_S7_F4_No: data.Core_Box_S7_F4_No || '',
+            Core_Box_S7_F4_Date: data.Core_Box_S7_F4_Date || '',
+            No_Of_Core_Box_Set: data.No_Of_Core_Box_Set || '',
+            Core_Box_Pieces: data.Core_Box_Pieces || ''
+        });
+
+        // Populate Casting Details
+        setCastingData({
+            Casting_Material_Grade: data.Casting_Material_Grade || '',
+            Moulding_Box_Size: data.Moulding_Box_Size || '',
+            Total_Weight: data.Total_Weight || '',
+            No_Of_Cavities: data.No_Of_Cavities || '',
+            Bunch_Wt: data.Bunch_Wt || '',
+            YieldPercent: data.YieldPercent || ''
+        });
+
+        // Populate Core Details - parse Core_Type string back to checkboxes
+        const coreTypeObj = {
+            shell: data.Core_Type?.includes('Shell') || false,
+            coldBox: data.Core_Type?.includes('Cold Box') || false,
+            noBake: data.Core_Type?.includes('No-Bake') || false
+        };
+
+        setCoreDetailsData({
+            Core_Wt: data.Core_Wt || '',
+            Core_Type: coreTypeObj,
+            shell_qty: data.shell_qty || '',
+            coldBox_qty: data.coldBox_qty || '',
+            noBake_qty: data.noBake_qty || '',
+            Main_Core: data.Main_Core === 'Yes' || data.Main_Core === true,
+            Side_Core: data.Side_Core === 'Yes' || data.Side_Core === true,
+            Loose_Core: data.Loose_Core === 'Yes' || data.Loose_Core === true,
+            mainCore_qty: data.mainCore_qty || '',
+            sideCore_qty: data.sideCore_qty || '',
+            looseCore_qty: data.looseCore_qty || ''
+        });
+
+        // Populate Chaplets & Chills
+        setChapletsChillsData({
+            Chaplets_COPE: data.Chaplets_COPE || '',
+            Chaplets_DRAG: data.Chaplets_DRAG || '',
+            Chills_COPE: data.Chills_COPE || '',
+            Chills_DRAG: data.Chills_DRAG || ''
+        });
+
+        // Populate Moulding Details
+        setMouldingData({
+            Mould_Vents_Size: data.Mould_Vents_Size || '',
+            Mould_Vents_No: data.Mould_Vents_No || '',
+            breaker_core_size: data.breaker_core_size || '',
+            down_sprue_size: data.down_sprue_size || '',
+            foam_filter_size: data.foam_filter_size || '',
+            sand_riser_size: data.sand_riser_size || '',
+            no_of_sand_riser: data.no_of_sand_riser || '',
+            ingate_size: data.ingate_size || '',
+            no_of_ingate: data.no_of_ingate || '',
+            runner_bar_size: data.runner_bar_size || '',
+            runner_bar_no: data.runner_bar_no || ''
+        });
+
+        // Populate Additional Info
+        setAdditionalData({
+            rev_no_status: data.rev_no_status || '',
+            date: data.date || '',
+            comment: data.comment || ''
+        });
+
+        // Populate Part Rows
+        if (data.parts && data.parts.length > 0) {
+            const formattedParts = data.parts.map(part => ({
+                partNoOption: part.partNo ? {
+                    value: part.partNo,
+                    label: part.internalPartNo || String(part.partNo),
+                    prodName: part.productName || '',
+                    gradeId: part.materialGradeId,
+                    gradeName: part.materialGradeName || ''
+                } : null,
+                productName: part.productName || '',
+                materialGradeId: part.materialGradeId || null,
+                materialGradeName: part.materialGradeName || '',
+                qty: part.qty || '',
+                weight: part.weight || ''
+            }));
+            setPartRows(formattedParts);
+        } else {
+            setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
+        }
+
+        // Populate Sleeve Rows (backend returns sleeveRows)
+        const sleeves = data.sleeveRows || data.sleeves;
+        if (sleeves && sleeves.length > 0) {
+            const formattedSleeves = sleeves.map(sleeve => ({
+                sleeve_name: sleeve.sleeve_name || '',
+                // Convert sleeve_type_size to number for proper matching with sleeveOptions
+                sleeve_type_size: sleeve.sleeve_type_size ? parseInt(sleeve.sleeve_type_size) || sleeve.sleeve_type_size : '',
+                // Keep the display name for the SearchableSelect to show
+                sleeve_type_size_name: sleeve.sleeve_type_size_name || '',
+                quantity: sleeve.quantity || ''
+            }));
+            setSleeveRows(formattedSleeves);
+        } else {
+            setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', sleeve_type_size_name: '', quantity: '' }]);
         }
     };
 
@@ -403,11 +507,11 @@ const PatternMaster = () => {
     const handleClear = () => {
         setMainData({
             PatternNo: '', Customer: null, Serial_No: '', Part_No: '', Product_Name: '',
-            Asset_No: '', Customer_Po_No: '', Tooling_PO_Date: '', Purchase_No: '', Purchase_Date: ''
+            Asset_No: '', Customer_Po_No: '', Tooling_PO_Date: '', Purchase_No: '', Purchase_Date: '', Pattern_Received_Date: ''
         });
         setPatternData({
             Quoted_Estimated_Weight: '', Pattern_Maker: null, Pattern_Material_Details: '',
-            No_Of_Patterns_Set: '', Pattern_Pieces: '', Rack_Location: ''
+            No_Of_Patterns_Set: '', Pattern_Pieces: '', Rack_Location: '', Box_Per_Heat: ''
         });
         setCoreBoxData({
             Core_Box_Material_Details: '', Core_Box_Location: '',
@@ -431,7 +535,7 @@ const PatternMaster = () => {
             foam_filter_size: '', sand_riser_size: '', no_of_sand_riser: '',
             ingate_size: '', no_of_ingate: '', runner_bar_size: '', runner_bar_no: ''
         });
-        setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', quantity: '' }]);
+        setSleeveRows([{ sleeve_name: '', sleeve_type_size: '', sleeve_type_size_name: '', quantity: '' }]);
         setAdditionalData({ rev_no_status: '', date: '', comment: '' });
         setPartRows([{ partNoOption: null, productName: '', materialGradeId: null, materialGradeName: '', qty: '', weight: '' }]);
         setErrors({});
@@ -518,6 +622,7 @@ const PatternMaster = () => {
         setSleeveRows(prev => [...prev, {
             sleeve_name: '',
             sleeve_type_size: '',
+            sleeve_type_size_name: '',
             quantity: ''
         }]);
     }, []);
@@ -587,7 +692,7 @@ const PatternMaster = () => {
             setErrors(validationErrors);
             setLoading(false);
             // Scroll to top or show alert
-            toast.error("Please fix the errors highlighted in red.");
+            toast.error("Please complete all required fields before submitting.");
             return;
         }
 
@@ -602,8 +707,12 @@ const PatternMaster = () => {
             if (hasAnyColdBox) coreTypeStringParts.push('Cold Box=1');
             if (hasAnyNoBake) coreTypeStringParts.push('No-Bake');
 
-            // Calculate Total Weight from all parts
-            const totalWeight = partRows.reduce((sum, row) => sum + (parseFloat(row.weight) || 0), 0).toFixed(2);
+            // Calculate Total Weight from all parts: (Qty × Weight) for each part
+            const totalWeight = partRows.reduce((sum, row) => {
+                const qty = parseFloat(row.qty) || 0;
+                const weight = parseFloat(row.weight) || 0;
+                return sum + (qty * weight);
+            }, 0).toFixed(2);
 
             // Extract IDs from state objects for submission
             const submissionData = {
@@ -611,7 +720,7 @@ const PatternMaster = () => {
                 Customer: mainData.Customer ? mainData.Customer.value : '',
 
                 ...patternData,
-                Pattern_Maker: patternData.Pattern_Maker ? patternData.Pattern_Maker.value : '',
+                Pattern_Maker: patternData.Pattern_Maker ? patternData.Pattern_Maker.value : null,
 
                 ...coreBoxData,
 
@@ -648,9 +757,8 @@ const PatternMaster = () => {
                 // Process parts rows to extract IDs
                 parts: partRows.map(row => ({
                     partNo: row.partNoOption ? row.partNoOption.value : '',
-                    productName: row.partNoOption ? row.partNoOption.prodName : '', // Fixed: use prodName from option
+                    productName: row.partNoOption ? row.partNoOption.prodName : '',
                     materialGradeId: row.materialGradeId || null,
-                    materialGradeName: row.materialGradeName || '',
                     qty: row.qty,
                     weight: row.weight
                 })),
@@ -686,164 +794,141 @@ const PatternMaster = () => {
         }
     };
 
-    // Define columns for DataTable
-    const columnHelper = createColumnHelper();
 
-    const columns = [
-        columnHelper.accessor('PatternId', { header: 'ID', size: 60 }),
-        columnHelper.accessor('PatternNo', { header: 'Pattern No', size: 120 }),
-        columnHelper.accessor('CustomerName', {
-            header: 'Customer',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Serial_No', { header: 'Serial No', size: 100 }),
-        columnHelper.accessor('Part_No', { header: 'Part No', size: 100 }),
-        columnHelper.accessor('Product_Name', {
-            header: 'Product Name',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Pattern_Maker_Name', {
-            header: 'Pattern Maker',
-            size: 150,
-            cell: info => <TextTooltip text={info.getValue()} maxLength={20} />
-        }),
-        columnHelper.accessor('Pattern_Material_Details', { header: 'Material', size: 100 }),
-        columnHelper.accessor('No_Of_Patterns_Set', { header: 'No of Set', size: 120 }),
-    ];
 
     return (
         <div className="card">
-            <h2 style={{ marginBottom: '1.5rem' }}>Pattern Master</h2>
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    <MainDetails
-                        data={mainData}
-                        onChange={handleMainChange}
-                        partRows={partRows}
-                        onPartRowChange={handlePartRowChange}
-                        onAddPartRow={addPartRow}
-                        onRemovePartRow={removePartRow}
-                        errors={errors}
-                    />
-
-                    <PatternSection
-                        data={patternData}
-                        onChange={handlePatternChange}
-                        errors={errors}
-                    />
-
-                    <CoreBoxSection
-                        data={coreBoxData}
-                        onChange={handleCoreBoxChange}
-                        errors={errors}
-                    />
-
-                    <CoreDetailsSection
-                        data={coreDetailsData}
-                        onChange={handleCoreDetailsChange}
-                        errors={errors}
-                    />
-
-                    <CastingSection
-                        data={castingData}
-                        onChange={handleCastingChange}
-                        errors={errors}
-                    />
-
-                    <MouldingSection
-                        data={mouldingData}
-                        onChange={handleMouldingChange}
-                    />
-
-                    <ChapletsChillsSection
-                        data={chapletsChillsData}
-                        onChange={handleChapletsChillsChange}
-                    />
-
-                    <SleevesSection
-                        sleeveRows={sleeveRows}
-                        onSleeveRowChange={handleSleeveRowChange}
-                        onAddSleeveRow={addSleeveRow}
-                        onRemoveSleeveRow={removeSleeveRow}
-                        sleeveOptions={sleeveOptions}
-                        errors={errors}
-                    />
-
-                    <AdditionalSection
-                        data={additionalData}
-                        onChange={handleAdditionalChange}
-                    />
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
-                    <button type="submit" disabled={loading} className="btn btn-primary">
-                        {loading ? 'Saving...' : (isEditing ? 'UPDATE' : 'ADD')}
-                    </button>
-                    {selectedId && (
-                        <button type="button" onClick={handleDeleteClick} className="btn" style={{ backgroundColor: '#EF4444', color: 'white' }}>
-                            DELETE
-                        </button>
-                    )}
-                    <button type="button" onClick={handleClear} className="btn btn-secondary">
-                        CLEAR
-                    </button>
-
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <label style={{ fontWeight: '500', whiteSpace: 'nowrap', color: '#374151' }}>Search:</label>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={handleSearchChange}
-                            onKeyPress={handleSearchKeyPress}
-                            placeholder="Pattern No, Customer..."
-                            className="input-field"
-                            style={{ minWidth: '200px' }}
-                        />
-                        <button type="button" onClick={handleSearch} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>🔍</button>
-                    </div>
-                </div>
-
-                {/* Error Message Display */}
-                {error && (
+            {/* Header with Stats and Edit Dropdown */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap',
+                gap: '1rem'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0 }}>Pattern Master</h2>
+                    {/* Patterns Count Card */}
                     <div style={{
-                        marginTop: '1rem',
-                        padding: '0.75rem',
-                        backgroundColor: '#FEE2E2',
-                        color: '#DC2626',
-                        borderRadius: '6px',
-                        border: '1px solid #FCA5A5'
+                        background: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)',
+                        borderLeft: '4px solid #8B5CF6',
+                        borderRadius: '12px',
+                        padding: '0.75rem 1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
                     }}>
-                        {error}
+                        <span style={{ fontSize: '1.5rem' }}>📋</span>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#6D28D9' }}>
+                                {statsLoading ? '...' : patternStats?.TotalPatterns || 0}
+                            </h3>
+                            <p style={{ margin: 0, color: '#6B7280', fontSize: '0.75rem' }}>Patterns</p>
+                        </div>
                     </div>
-                )}
-            </form>
-
-            {/* Table Section */}
-            <div className="section-container section-gray">
-                <h3 className="section-title gray">Pattern Records ({patterns.length} patterns)</h3>
-
-                {isQueryLoading ? (
-                    <TableSkeleton rows={10} columns={12} />
-                ) : (
-                    <DataTable
-                        data={patterns}
-                        columns={columns}
-                        onRowClick={handleRowClick}
-                        selectedId={selectedId}
-                    />
-                )}
-
-                {selectedId && (
-                    <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#DBEAFE', borderRadius: '0.375rem', fontSize: '0.875rem', color: '#1E40AF' }}>
-                        <strong>Selected Pattern ID: {selectedId}</strong> - Click DELETE to remove or CLEAR to deselect.
+                </div>
+                {activeTab === 'master' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '280px' }}>
+                        <label style={{ fontWeight: '500', color: '#374151', whiteSpace: 'nowrap' }}>Edit Pattern:</label>
+                        <div style={{ flex: 1 }}>
+                            <Combobox
+                                value={selectedId || ''}
+                                onChange={async (patternId) => {
+                                    if (patternId) {
+                                        const pattern = patternNumbers.find(p => p.value === patternId);
+                                        if (pattern) {
+                                            // Load pattern details
+                                            try {
+                                                const response = await api.get(`/pattern-master/${patternId}`);
+                                                handleRowClick(response.data);
+                                            } catch (err) {
+                                                console.error('Error loading pattern:', err);
+                                                toast.error('Failed to load pattern for editing');
+                                            }
+                                        }
+                                    }
+                                }}
+                                options={patternNumbers}
+                                placeholder="Select pattern to edit..."
+                            />
+                        </div>
                     </div>
                 )}
             </div>
+
+            {/* Tab Navigation */}
+            <AnimatedTabs
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
+
+            {/* Tab Content */}
+            {activeTab === 'master' ? (
+                <>
+                    <PatternForm
+                        // Data
+                        mainData={mainData}
+                        patternData={patternData}
+                        coreBoxData={coreBoxData}
+                        coreDetailsData={coreDetailsData}
+                        castingData={castingData}
+                        mouldingData={mouldingData}
+                        chapletsChillsData={chapletsChillsData}
+                        sleeveRows={sleeveRows}
+                        additionalData={additionalData}
+                        partRows={partRows}
+                        sleeveOptions={sleeveOptions}
+
+                        // Handlers
+                        onMainChange={handleMainChange}
+                        onPatternChange={handlePatternChange}
+                        onCoreBoxChange={handleCoreBoxChange}
+                        onCoreDetailsChange={handleCoreDetailsChange}
+                        onCastingChange={handleCastingChange}
+                        onMouldingChange={handleMouldingChange}
+                        onChapletsChillsChange={handleChapletsChillsChange}
+                        onAdditionalChange={handleAdditionalChange}
+
+                        // Array Handlers
+                        onPartRowChange={handlePartRowChange}
+                        onAddPartRow={addPartRow}
+                        onRemovePartRow={removePartRow}
+                        onSleeveRowChange={handleSleeveRowChange}
+                        onAddSleeveRow={addSleeveRow}
+                        onRemoveSleeveRow={removeSleeveRow}
+
+                        // Actions
+                        onSubmit={handleSubmit}
+                        onClear={handleClear}
+                        onDelete={handleDeleteClick}
+
+                        // Search
+                        searchTerm={searchTerm}
+                        onSearchChange={handleSearchChange}
+
+                        // State
+                        errors={errors}
+                        loading={loading}
+                        isEditing={isEditing}
+                        selectedId={selectedId}
+                        error={error}
+                    />
+
+                    {/* Unified Records Table - Shows patterns with expandable parts/sleeves */}
+                    <UnifiedRecordsTable
+                        searchQuery={debouncedSearchTerm}
+                        refreshTrigger={refreshTrigger}
+                        onRowClick={handleRowClick}
+                        selectedId={selectedId}
+                    />
+                </>
+            ) : activeTab === 'history' ? (
+                <PatternHistoryTab />
+            ) : (
+                <PatternReturnSection />
+            )}
 
             <AlertDialog
                 isOpen={showDeleteDialog}

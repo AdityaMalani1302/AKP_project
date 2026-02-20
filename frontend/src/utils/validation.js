@@ -44,10 +44,7 @@ export const validatePatternMaster = (formData) => {
 
     // --- 2. Pattern Section ---
 
-    // Pattern Maker (Required - usually critical for sourcing)
-    if (!formData.Pattern_Maker) {
-        errors.Pattern_Maker = 'Pattern Maker is required';
-    }
+    // Pattern Maker (Optional)
 
     // Numeric checks for optional fields
     if (formData.Quoted_Estimated_Weight && isNaN(formData.Quoted_Estimated_Weight)) {

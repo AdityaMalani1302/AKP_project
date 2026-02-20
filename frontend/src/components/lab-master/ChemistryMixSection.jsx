@@ -93,6 +93,17 @@ const ChemistryMixSection = ({ data, onChange }) => {
                         />
                     </div>
                     <div>
+                        <label style={labelStyle}>Mg_Chem %</label>
+                        <input
+                            type="text"
+                            name="Mg_Chem"
+                            value={data.Mg_Chem || ''}
+                            onChange={onChange}
+                            style={inputStyle}
+                            placeholder="Mg_Chem %"
+                        />
+                    </div>
+                    <div>
                         <label style={labelStyle}>CE</label>
                         <input
                             type="text"
@@ -101,6 +112,28 @@ const ChemistryMixSection = ({ data, onChange }) => {
                             onChange={onChange}
                             style={inputStyle}
                             placeholder="CE"
+                        />
+                    </div>
+                    <div>
+                        <label style={labelStyle}>Nickel %</label>
+                        <input
+                            type="text"
+                            name="Nickel"
+                            value={data.Nickel || ''}
+                            onChange={onChange}
+                            style={inputStyle}
+                            placeholder="Nickel %"
+                        />
+                    </div>
+                    <div>
+                        <label style={labelStyle}>Moly %</label>
+                        <input
+                            type="text"
+                            name="Moly"
+                            value={data.Moly || ''}
+                            onChange={onChange}
+                            style={inputStyle}
+                            placeholder="Moly %"
                         />
                     </div>
                 </div>
@@ -162,14 +195,14 @@ const ChemistryMixSection = ({ data, onChange }) => {
                         />
                     </div>
                     <div>
-                        <label style={labelStyle}>Mg</label>
+                        <label style={labelStyle}>Mg_Mix</label>
                         <input
                             type="text"
-                            name="Mg"
-                            value={data.Mg || ''}
+                            name="Mg_Mix"
+                            value={data.Mg_Mix || ''}
                             onChange={onChange}
                             style={inputStyle}
-                            placeholder="Mg"
+                            placeholder="Mg_Mix"
                         />
                     </div>
                 </div>

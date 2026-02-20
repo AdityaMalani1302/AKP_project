@@ -1,10 +1,11 @@
 import React, { memo, useState, useEffect } from 'react';
 import Combobox from '../common/Combobox';
+import AutocompleteInput from '../common/AutocompleteInput';
+import DatePicker from '../common/DatePicker';
 import { labelStyle, inputStyle } from './styles';
 import api from '../../api';
 
-// Helper to remove react-select styles dependency if no longer used
-// import { customSelectStyles } from './styles'; // Removed
+const FORM_PREFIX = 'patternMaster';
 
 const MainDetails = ({
     data,
@@ -67,12 +68,12 @@ const MainDetails = ({
             <div className="form-grid">
                 <div>
                     <label style={labelStyle}>Pattern No <span style={{ color: 'red' }}>*</span></label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="PatternNo"
                         name="PatternNo"
                         value={data.PatternNo}
                         onChange={onChange}
-                        required
                         style={inputStyle}
                         placeholder="Enter pattern number"
                     />
@@ -92,8 +93,9 @@ const MainDetails = ({
 
                 <div>
                     <label style={labelStyle}>Serial No</label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="Serial_No"
                         name="Serial_No"
                         value={data.Serial_No}
                         onChange={onChange}
@@ -128,12 +130,11 @@ const MainDetails = ({
 
                 <div>
                     <label style={labelStyle}>Tooling PO Date</label>
-                    <input
-                        type="date"
+                    <DatePicker
                         name="Tooling_PO_Date"
-                        value={data.Tooling_PO_Date}
+                        value={data.Tooling_PO_Date ? data.Tooling_PO_Date.split('T')[0] : ''}
                         onChange={onChange}
-                        style={inputStyle}
+                        placeholder="Select date..."
                     />
                 </div>
 
@@ -151,12 +152,21 @@ const MainDetails = ({
 
                 <div>
                     <label style={labelStyle}>Purchase Date</label>
-                    <input
-                        type="date"
+                    <DatePicker
                         name="Purchase_Date"
-                        value={data.Purchase_Date}
+                        value={data.Purchase_Date ? data.Purchase_Date.split('T')[0] : ''}
                         onChange={onChange}
-                        style={inputStyle}
+                        placeholder="Select date..."
+                    />
+                </div>
+
+                <div>
+                    <label style={labelStyle}>Pattern Received Date</label>
+                    <DatePicker
+                        name="Pattern_Received_Date"
+                        value={data.Pattern_Received_Date ? data.Pattern_Received_Date.split('T')[0] : ''}
+                        onChange={onChange}
+                        placeholder="Select date..."
                     />
                 </div>
             </div>
@@ -178,7 +188,7 @@ const MainDetails = ({
                         key={index}
                         style={{
                             display: 'grid',
-                            gridTemplateColumns: '1.5fr 1.5fr 1fr 0.8fr 0.8fr 50px',
+                            gridTemplateColumns: '1.5fr 1.5fr 1fr 0.8fr 0.8fr 0.8fr 50px',
                             gap: '0.75rem',
                             marginBottom: '1rem',
                             alignItems: 'end'
@@ -264,6 +274,25 @@ const MainDetails = ({
                             {errors[`part_${index}_weight`] && <span style={{ color: '#DC2626', fontSize: '0.75rem', display: 'block' }}>{errors[`part_${index}_weight`]}</span>}
                         </div>
 
+                        <div>
+                            {index === 0 && (
+                                <label style={labelStyle}>Total</label>
+                            )}
+                            <input
+                                type="text"
+                                value={((parseFloat(row.qty) || 0) * (parseFloat(row.weight) || 0)).toFixed(2)}
+                                disabled
+                                style={{
+                                    ...inputStyle,
+                                    backgroundColor: '#DBEAFE',
+                                    cursor: 'not-allowed',
+                                    color: '#1E40AF',
+                                    fontWeight: '600'
+                                }}
+                                placeholder="0.00"
+                            />
+                        </div>
+
                         <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
                             {partRows.length > 1 && (
                                 <button
@@ -327,7 +356,7 @@ const MainDetails = ({
                         minWidth: '100px',
                         textAlign: 'right'
                     }}>
-                        {partRows.reduce((sum, row) => sum + (parseFloat(row.weight) || 0), 0).toFixed(2)}
+                        {partRows.reduce((sum, row) => sum + ((parseFloat(row.qty) || 0) * (parseFloat(row.weight) || 0)), 0).toFixed(2)}
                     </div>
                 </div>
             </div>

@@ -13,8 +13,9 @@ const createAdminUser = async () => {
         }
 
         // Admin credentials
-        const username = 'admin';
-        const password = 'admin123';  // Change this to a secure password
+        const username = process.env.ADMIN_USERNAME || 'admin';
+        // Generate a secure random password if not provided via environment variable
+        const password = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(12).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 12);
         const fullName = 'System Administrator';
         const role = 'admin';
 

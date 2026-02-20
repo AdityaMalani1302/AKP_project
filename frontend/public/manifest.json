@@ -1,0 +1,28 @@
+{
+  "name": "Smart ERP",
+  "short_name": "SmartERP",
+  "description": "Manufacturing ERP System - Pattern Master, Quality Lab, Sales & Finance Dashboards",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8B5CF6",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/smart-erp-logo.png",
+      "sizes": "51x44",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "72x82",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
+

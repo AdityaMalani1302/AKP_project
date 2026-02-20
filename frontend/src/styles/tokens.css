@@ -52,6 +52,16 @@
     --color-purple-100: #E9D5FF;
     --color-purple-700: #6B21A8;
 
+    /* Sky Blue (Primary Theme) */
+    --color-sky-50: #F0F9FF;
+    --color-sky-100: #E0F2FE;
+    --color-sky-200: #BAE6FD;
+    --color-sky-300: #7DD3FC;
+    --color-sky-400: #38BDF8;
+    --color-sky-500: #0EA5E9;
+    --color-sky-600: #0284C7;
+    --color-sky-700: #0369A1;
+
     /* Cyan */
     --color-cyan-50: #E0F2FE;
     --color-cyan-100: #BAE6FD;

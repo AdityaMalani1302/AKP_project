@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { labelStyle, inputStyle, textareaStyle } from './styles';
+import DatePicker from '../common/DatePicker';
 
 const AdditionalSection = ({ data, onChange }) => {
     return (
@@ -22,12 +23,11 @@ const AdditionalSection = ({ data, onChange }) => {
 
                 <div>
                     <label style={labelStyle}>Date</label>
-                    <input
-                        type="date"
+                    <DatePicker
                         name="date"
-                        value={data.date}
+                        value={data.date ? data.date.split('T')[0] : ''}
                         onChange={onChange}
-                        style={inputStyle}
+                        placeholder="Select date..."
                     />
                 </div>
 

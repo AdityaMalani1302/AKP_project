@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { labelStyle, inputStyle, selectStyle, inlineLabelStyle } from './styles';
+import DatePicker from '../common/DatePicker';
 
 const CoreBoxSection = ({ data, onChange, errors = {} }) => {
     return (
@@ -20,6 +21,7 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                         <option value="AL">AL</option>
                         <option value="CI">CI</option>
                         <option value="SG">SG</option>
+                        <option value="AL-SG">AL-SG</option>
                     </select>
                 </div>
 
@@ -48,6 +50,9 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                         <option value="">Select Core Box Set</option>
                         <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
                         <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="3 Set (Top-Bottom) = 6 No's">3 Set (Top-Bottom) = 6 No's</option>
+                        <option value="4 Set (Top-Bottom) = 8 No's">4 Set (Top-Bottom) = 8 No's</option>
+                        <option value="5 Set (Top-Bottom) = 10 No's">5 Set (Top-Bottom) = 10 No's</option>
                     </select>
                 </div>
 
@@ -60,8 +65,11 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                         style={selectStyle}
                     >
                         <option value="">Select Core Box Pieces</option>
-                        <option value="1 Set (Top-Bottom) = 2 No's">1 Set (Top-Bottom) = 2 No's</option>
-                        <option value="2 Sets (Top-Bottom) = 4 No's">2 Sets (Top-Bottom) = 4 No's</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
                     </select>
                 </div>
 
@@ -78,15 +86,13 @@ const CoreBoxSection = ({ data, onChange, errors = {} }) => {
                     />
                 </div>
 
-                {/* Core Box S7 F4 - Date Field */}
                 <div>
                     <label style={labelStyle}>Core Box S7 F4 Date</label>
-                    <input
-                        type="date"
+                    <DatePicker
                         name="Core_Box_S7_F4_Date"
-                        value={data.Core_Box_S7_F4_Date || ''}
+                        value={data.Core_Box_S7_F4_Date ? data.Core_Box_S7_F4_Date.split('T')[0] : ''}
                         onChange={onChange}
-                        style={inputStyle}
+                        placeholder="Select date..."
                     />
                 </div>
             </div>

@@ -1,34 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { createColumnHelper } from '@tanstack/react-table';
 import Select from 'react-select';
 import { toast } from 'sonner';
 import api from '../api';
-import DataTable from './common/DataTable';
-import TableSkeleton from './common/TableSkeleton';
 
-const columnHelper = createColumnHelper();
+// Database options
+const databases = [
+    { id: 'IcSoftVer3', name: 'IcSoft Ver3' },
+    { id: 'IcSoftReportVer3', name: 'IcSoft Report Ver3' },
+    { id: 'IcSoftLedgerVer3', name: 'IcSoft Ledger Ver3' }
+];
 
-const fetchTables = async () => {
-    const res = await api.get('/tables');
+const fetchTables = async (database) => {
+    const res = await api.get(`/tables?database=${database}`);
     return res.data.sort((a, b) => a.localeCompare(b));
 };
 
-const fetchTableData = async (tableName, page, limit) => {
+const fetchTableData = async (tableName, page, limit, database) => {
     if (!tableName) return { data: [], total: 0 };
-    const res = await api.get(`/tables/${tableName}?page=${page}&limit=${limit}`);
+    const res = await api.get(`/tables/${tableName}?page=${page}&limit=${limit}&database=${database}`);
     return res.data;
 };
 
 const DatabaseExplorer = () => {
+    const [selectedDatabase, setSelectedDatabase] = useState('IcSoftVer3');
     const [selectedTable, setSelectedTable] = useState('');
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(50);
 
-    // Fetch Tables List
-    const { data: tables = [], isError: isTablesError } = useQuery({
-        queryKey: ['dbTables'],
-        queryFn: fetchTables,
+    // Fetch Tables List for selected database
+    const { data: tables = [], isError: isTablesError, isLoading: isTablesLoading } = useQuery({
+        queryKey: ['dbTables', selectedDatabase],
+        queryFn: () => fetchTables(selectedDatabase),
         staleTime: 10 * 60 * 1000,
     });
 
@@ -39,8 +42,8 @@ const DatabaseExplorer = () => {
         isError: isDataError,
         isFetching: isDataFetching
     } = useQuery({
-        queryKey: ['tableData', selectedTable, page, limit],
-        queryFn: () => fetchTableData(selectedTable, page, limit),
+        queryKey: ['tableData', selectedTable, page, limit, selectedDatabase],
+        queryFn: () => fetchTableData(selectedTable, page, limit, selectedDatabase),
         placeholderData: keepPreviousData,
         enabled: !!selectedTable,
     });
@@ -51,24 +54,12 @@ const DatabaseExplorer = () => {
     const totalPages = Math.ceil(total / limit);
     const tableOptions = tables.map(t => ({ value: t, label: t }));
 
-    // Dynamic Columns
-    const columns = useMemo(() => {
-        if (!rows || rows.length === 0) return [];
-        const firstRow = rows[0];
-        return Object.keys(firstRow).map(key =>
-            columnHelper.accessor(key, {
-                header: key,
-                size: 150,
-                minWidth: 100,
-                cell: info => {
-                    const val = info.getValue();
-                    if (val === null) return <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>null</span>;
-                    if (typeof val === 'object') return JSON.stringify(val);
-                    return String(val);
-                }
-            })
-        );
-    }, [rows]);
+    const handleDatabaseChange = (e) => {
+        const newDb = e.target.value;
+        setSelectedDatabase(newDb);
+        setSelectedTable(''); // Clear table selection when database changes
+        setPage(1);
+    };
 
     const handleTableChange = (selectedOption) => {
         setSelectedTable(selectedOption ? selectedOption.value : '');
@@ -102,12 +93,43 @@ const DatabaseExplorer = () => {
                 <p className="page-subtitle">View and analyze data from your connected databases.</p>
             </div>
 
+            {/* Database and Table Selection */}
             <div className="flex items-center gap-lg mb-xl p-lg" style={{
                 backgroundColor: 'var(--bg-secondary)',
                 borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-gray-100)'
+                border: '1px solid var(--color-gray-100)',
+                flexWrap: 'wrap'
             }}>
-                <div style={{ flex: 1, maxWidth: '400px' }}>
+                {/* Database Selector */}
+                <div style={{ minWidth: '200px' }}>
+                    <label className="text-sm font-medium mb-sm" style={{ display: 'block', color: 'var(--text-secondary)' }}>
+                        Select Database
+                    </label>
+                    <select
+                        value={selectedDatabase}
+                        onChange={handleDatabaseChange}
+                        style={{
+                            padding: '0.625rem 1rem',
+                            borderRadius: '0.375rem',
+                            border: '1px solid #D1D5DB',
+                            backgroundColor: '#FFFFFF',
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            width: '100%',
+                            minHeight: '42px'
+                        }}
+                    >
+                        {databases.map(db => (
+                            <option key={db.id} value={db.id}>
+                                {db.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Table Selector */}
+                <div style={{ flex: 1, minWidth: '250px', maxWidth: '400px' }}>
                     <label className="text-sm font-medium mb-sm" style={{ display: 'block', color: 'var(--text-secondary)' }}>
                         Select Table
                     </label>
@@ -115,8 +137,10 @@ const DatabaseExplorer = () => {
                         value={selectedTable ? { value: selectedTable, label: selectedTable } : null}
                         onChange={handleTableChange}
                         options={tableOptions}
-                        placeholder="Search & Select Table..."
+                        placeholder={isTablesLoading ? "Loading tables..." : "Search & Select Table..."}
                         isClearable
+                        isLoading={isTablesLoading}
+                        isDisabled={isTablesLoading}
                         styles={{
                             control: (base, state) => ({
                                 ...base,
@@ -183,26 +207,96 @@ const DatabaseExplorer = () => {
                         </div>
                     </div>
 
-                    {isDataLoading ? (
-                        <TableSkeleton rows={10} columns={5} />
-                    ) : rows.length === 0 ? (
-                        <div style={{
-                            textAlign: 'center',
-                            padding: '3rem',
-                            backgroundColor: '#F9FAFB',
-                            borderRadius: '0.5rem',
-                            border: '1px dashed #D1D5DB',
-                            color: '#6B7280'
-                        }}>
-                            No data found in this table.
-                        </div>
-                    ) : (
-                        <DataTable
-                            data={rows}
-                            columns={columns}
-                            maxHeight="500px"
-                        />
-                    )}
+                    {/* Simple HTML Table with scroll */}
+                    <div style={{ 
+                        border: '1px solid #E5E7EB', 
+                        borderRadius: '6px', 
+                        overflow: 'auto',
+                        maxHeight: '500px'
+                    }}>
+                        {isDataLoading ? (
+                            <div style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                                Loading data...
+                            </div>
+                        ) : rows && rows.length > 0 ? (
+                            <table style={{ 
+                                width: '100%', 
+                                borderCollapse: 'collapse',
+                                minWidth: 'max-content'
+                            }}>
+                                <thead style={{ 
+                                    position: 'sticky', 
+                                    top: 0, 
+                                    backgroundColor: '#F9FAFB',
+                                    zIndex: 10
+                                }}>
+                                    <tr>
+                                        {Object.keys(rows[0]).map(key => (
+                                            <th key={key} style={{
+                                                padding: '0.75rem 1rem',
+                                                fontWeight: '600',
+                                                textAlign: 'left',
+                                                whiteSpace: 'nowrap',
+                                                borderBottom: '2px solid #E5E7EB',
+                                                backgroundColor: '#F9FAFB',
+                                                fontSize: '0.875rem',
+                                                color: '#374151'
+                                            }}>
+                                                {key}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, rowIndex) => (
+                                        <tr key={rowIndex} style={{
+                                            borderBottom: '1px solid #E5E7EB',
+                                            backgroundColor: rowIndex % 2 === 0 ? 'white' : '#FAFAFA'
+                                        }}>
+                                            {Object.entries(row).map(([key, value]) => (
+                                                <td key={key} style={{
+                                                    padding: '0.625rem 1rem',
+                                                    whiteSpace: 'nowrap',
+                                                    fontSize: '0.875rem',
+                                                    color: '#374151'
+                                                }}>
+                                                    {value === null ? (
+                                                        <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>null</span>
+                                                    ) : typeof value === 'object' ? (
+                                                        JSON.stringify(value)
+                                                    ) : (
+                                                        String(value)
+                                                    )}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '3rem',
+                                backgroundColor: '#F9FAFB',
+                                color: '#6B7280'
+                            }}>
+                                No data found in this table.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Row count footer */}
+                    <div style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.75rem',
+                        color: '#6B7280',
+                        backgroundColor: '#F9FAFB',
+                        borderRadius: '0 0 6px 6px',
+                        border: '1px solid #E5E7EB',
+                        borderTop: 'none'
+                    }}>
+                        Showing {rows?.length || 0} rows
+                    </div>
                 </div>
             )}
 

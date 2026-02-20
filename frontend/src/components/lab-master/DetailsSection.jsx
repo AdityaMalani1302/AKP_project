@@ -1,5 +1,8 @@
 import React from 'react';
 import { labelStyle, inputStyle } from './styles';
+import AutocompleteInput from '../common/AutocompleteInput';
+
+const FORM_PREFIX = 'labMaster';
 
 const DetailsSection = ({ data, onChange }) => {
     return (
@@ -14,9 +17,10 @@ const DetailsSection = ({ data, onChange }) => {
             </h3>
             <div className="form-grid">
                 <div>
-                    <label style={labelStyle}>CUSTOMER</label>
-                    <input
-                        type="text"
+                    <label style={labelStyle}>CUSTOMER <span style={{ color: '#EF4444' }}>*</span></label>
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="Customer"
                         name="Customer"
                         value={data.Customer || ''}
                         onChange={onChange}
@@ -25,9 +29,10 @@ const DetailsSection = ({ data, onChange }) => {
                     />
                 </div>
                 <div>
-                    <label style={labelStyle}>Drg. No.</label>
-                    <input
-                        type="text"
+                    <label style={labelStyle}>Drg. No. <span style={{ color: '#EF4444' }}>*</span></label>
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="DrgNo"
                         name="DrgNo"
                         value={data.DrgNo || ''}
                         onChange={onChange}
@@ -37,8 +42,9 @@ const DetailsSection = ({ data, onChange }) => {
                 </div>
                 <div>
                     <label style={labelStyle}>Description</label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="Description"
                         name="Description"
                         value={data.Description || ''}
                         onChange={onChange}
@@ -48,8 +54,9 @@ const DetailsSection = ({ data, onChange }) => {
                 </div>
                 <div>
                     <label style={labelStyle}>Grade</label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="Grade"
                         name="Grade"
                         value={data.Grade || ''}
                         onChange={onChange}
@@ -70,8 +77,9 @@ const DetailsSection = ({ data, onChange }) => {
                 </div>
                 <div>
                     <label style={labelStyle}>Min-Max Thickness</label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="MinMaxThickness"
                         name="MinMaxThickness"
                         value={data.MinMaxThickness || ''}
                         onChange={onChange}
@@ -81,8 +89,9 @@ const DetailsSection = ({ data, onChange }) => {
                 </div>
                 <div>
                     <label style={labelStyle}>Thickness Group</label>
-                    <input
-                        type="text"
+                    <AutocompleteInput
+                        formPrefix={FORM_PREFIX}
+                        fieldName="ThicknessGroup"
                         name="ThicknessGroup"
                         value={data.ThicknessGroup || ''}
                         onChange={onChange}
@@ -126,3 +135,4 @@ const DetailsSection = ({ data, onChange }) => {
 };
 
 export default DetailsSection;
+
