@@ -1,5 +1,6 @@
 import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useLocation } from 'react-router-dom';
 
 const ErrorFallback = ({ error, resetErrorBoundary }) => {
     return (
@@ -46,6 +47,8 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
 };
 
 const GlobalErrorBoundary = ({ children }) => {
+    const location = useLocation();
+
     return (
         <ErrorBoundary
             FallbackComponent={ErrorFallback}
@@ -53,6 +56,7 @@ const GlobalErrorBoundary = ({ children }) => {
                 // Reset the state of your app so the error doesn't happen again
                 window.location.reload();
             }}
+            resetKeys={[location.pathname]}
         >
             {children}
         </ErrorBoundary>

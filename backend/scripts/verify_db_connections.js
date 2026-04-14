@@ -1,4 +1,5 @@
 const { connectSQL, getPool, closeSQL } = require('../config/db');
+const { DB } = require('../config/constants');
 
 const verifyConnections = async () => {
     console.log('\n=== Starting Database Connection Verification ===\n');
@@ -11,7 +12,7 @@ const verifyConnections = async () => {
         process.exit(1);
     }
 
-    const databases = ['IcSoftVer3', 'IcSoftReportVer3', 'IcSoftLedgerVer3', 'BizSpot'];
+    const databases = Object.values(DB.POOLS);
     let allSuccess = true;
 
     for (const dbName of databases) {

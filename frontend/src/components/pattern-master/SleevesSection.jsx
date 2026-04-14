@@ -1,5 +1,7 @@
 import React, { memo } from 'react';
-import { labelStyle, inputStyle, selectStyle } from './styles';
+import { labelStyle, inputStyle } from './styles';
+import SearchableSelect from '../common/SearchableSelect';
+import { Wrench } from 'lucide-react';
 
 const SleevesSection = ({
     sleeveRows,
@@ -11,8 +13,8 @@ const SleevesSection = ({
 }) => {
     return (
         <div className="section-container section-teal">
-            <h3 className="section-title teal">
-                🔧 Sleeves (Multiple Sleeves Supported)
+            <h3 className="section-title teal" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Wrench size={20} /> Sleeves (Multiple Sleeves Supported)
             </h3>
 
             {/* Dynamic Sleeve Rows */}
@@ -46,23 +48,24 @@ const SleevesSection = ({
                         {errors[`sleeve_${index}_name`] && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>{errors[`sleeve_${index}_name`]}</span>}
                     </div>
 
-                    {/* Sleeve Type & Size - Dynamic from RawMaterial */}
+                    {/* Sleeve Type & Size - Searchable */}
                     <div>
                         <label style={labelStyle}>
                             Sleeve Name & Size {index === 0 && <span style={{ color: '#DC2626' }}>*</span>}
                         </label>
-                        <select
+                        <SearchableSelect
+                            options={
+                                // Ensure currently selected value shows even if not in sleeveOptions yet
+                                row.sleeve_type_size && row.sleeve_type_size_name && !sleeveOptions.find(opt => opt.value == row.sleeve_type_size)
+                                    ? [{ value: row.sleeve_type_size, label: row.sleeve_type_size_name }, ...sleeveOptions]
+                                    : sleeveOptions
+                            }
                             value={row.sleeve_type_size}
                             onChange={(e) => onSleeveRowChange(index, 'sleeve_type_size', e.target.value)}
-                            style={selectStyle}
-                        >
-                            <option value="">Select Name & Size</option>
-                            {sleeveOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
+                            name={`sleeve_type_size_${index}`}
+                            placeholder="Search sleeve..."
+                            isClearable={true}
+                        />
                         {errors[`sleeve_${index}_size`] && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>{errors[`sleeve_${index}_size`]}</span>}
                     </div>
 

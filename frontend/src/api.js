@@ -1,18 +1,14 @@
 import axios from 'axios';
 
-const api = axios.create({
-    baseURL: 'http://localhost:5000/api',
-    withCredentials: true
-});
+// For local development: uses relative /api (proxied by Vite)
+// For production: uses VITE_API_URL environment variable (Cloudflare tunnel URL)
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api` 
+    : '/api';
 
-api.interceptors.request.use((config) => {
-    const selectedDb = localStorage.getItem('selectedDatabase');
-    if (selectedDb) {
-        config.headers['x-database'] = selectedDb;
-    }
-    return config;
-}, (error) => {
-    return Promise.reject(error);
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true
 });
 
 export default api;

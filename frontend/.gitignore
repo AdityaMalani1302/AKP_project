@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Debug artifacts
+lint.json
+linterrors.txt
+build_log.txt

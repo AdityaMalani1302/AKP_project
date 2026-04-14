@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import { Wrench } from 'lucide-react';
 import { labelStyle, inputStyle, smallNumberInputStyle } from './styles';
 
 const CoreDetailsSection = ({
@@ -8,8 +9,8 @@ const CoreDetailsSection = ({
 }) => {
     return (
         <div className="section-container section-purple">
-            <h3 className="section-title purple">
-                🔩 Core Details
+            <h3 className="section-title purple" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Wrench size={20} /> Core Details
             </h3>
 
             <div className="form-grid">

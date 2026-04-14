@@ -1,11 +1,13 @@
 import React, { memo } from 'react';
 import { labelStyle, inputStyle, textareaStyle } from './styles';
+import DatePicker from '../common/DatePicker';
+import { ClipboardType } from 'lucide-react';
 
 const AdditionalSection = ({ data, onChange }) => {
     return (
         <div className="section-container section-gray">
-            <h3 className="section-title gray">
-                📋 Additional Information
+            <h3 className="section-title gray" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ClipboardType size={20} /> Additional Information
             </h3>
             <div className="form-grid">
                 <div>
@@ -22,12 +24,11 @@ const AdditionalSection = ({ data, onChange }) => {
 
                 <div>
                     <label style={labelStyle}>Date</label>
-                    <input
-                        type="date"
+                    <DatePicker
                         name="date"
-                        value={data.date}
+                        value={data.date ? data.date.split('T')[0] : ''}
                         onChange={onChange}
-                        style={inputStyle}
+                        placeholder="Select date..."
                     />
                 </div>
 

@@ -1,11 +1,12 @@
 import React, { memo } from 'react';
+import { Factory } from 'lucide-react';
 import { labelStyle, inputStyle } from './styles';
 
 const MouldingSection = ({ data, onChange }) => {
     return (
         <div className="section-container section-orange">
-            <h3 className="section-title orange">
-                🏭 Moulding
+            <h3 className="section-title orange" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Factory size={20} /> Moulding
             </h3>
             <div className="form-grid">
                 <div>

@@ -1,11 +1,12 @@
 import React, { memo } from 'react';
+import { FileText } from 'lucide-react';
 import { labelStyle, inputStyle } from './styles';
 
 const AdditionalInfo = ({ data, onChange }) => {
     return (
         <div className="section-container" style={{ backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }}>
-            <h3 className="section-title" style={{ color: '#374151' }}>
-                📝 Additional Information
+            <h3 className="section-title" style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={20} /> Additional Information
             </h3>
             <div className="form-grid">
                 <div>
