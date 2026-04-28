@@ -824,3 +824,47 @@
 .border-b {
     border-bottom: 1px solid #E5E7EB;
 }
+
+/* ========================================
+   PREFERS REDUCED MOTION
+   Disable animations for users who prefer reduced motion
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .animate-fade-in,
+    .animate-fade-in-up,
+    .animate-slide-in-right,
+    .animate-scale-in,
+    .animate-shimmer,
+    .animate-pulse,
+    .animate-highlight,
+    .page-transition,
+    .table-row-animate,
+    .card-hover {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    .btn-ripple::after {
+        display: none !important;
+    }
+
+    .btn-hover-scale:hover,
+    .btn-hover-scale:active {
+        transform: none !important;
+    }
+
+    .card-hover:hover {
+        transform: none !important;
+    }
+}

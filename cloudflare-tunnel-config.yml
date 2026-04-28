@@ -1,0 +1,16 @@
+# When moving to custom domain (erp.akpfoundries.com),
+# you need to configure a named Cloudflare tunnel.
+# This file is a template - fill in your tunnel ID after creating it.
+
+# Tunnel configuration
+tunnel: YOUR_TUNNEL_ID_HERE
+credentials-file: C:\Users\YOUR_USERNAME\.cloudflared\YOUR_TUNNEL_ID.json
+
+# Ingress rules
+ingress:
+  # Route api.akpfoundries.com to local backend
+  - hostname: api.akpfoundries.com
+    service: http://localhost:5000
+
+  # Catch-all rule (required)
+  - service: http_status:404

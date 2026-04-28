@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { FiAlertTriangle, FiTrash2, FiX } from 'react-icons/fi';
+
+const FOCUSABLE_ELEMENTS = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
  * AlertDialog - A confirmation dialog with animations and accessibility
@@ -25,28 +27,61 @@ const AlertDialog = ({
     isLoading = false 
 }) => {
     const confirmButtonRef = useRef(null);
+    const cancelButtonRef = useRef(null);
+    const dialogRef = useRef(null);
+    const previousActiveElement = useRef(null);
 
-    // Handle escape key and focus management
-    useEffect(() => {
-        const handleEscape = (e) => {
-            if (e.key === 'Escape' && isOpen && !isLoading) {
-                onCancel();
+    const getFocusableElements = useCallback(() => {
+        if (!dialogRef.current) return [];
+        return Array.from(dialogRef.current.querySelectorAll(FOCUSABLE_ELEMENTS));
+    }, []);
+
+    const handleTabKey = useCallback((e) => {
+        if (e.key !== 'Tab') return;
+        
+        const focusable = getFocusableElements();
+        if (focusable.length === 0) return;
+        
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        
+        if (e.shiftKey) {
+            if (document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
             }
-        };
+        } else {
+            if (document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    }, [getFocusableElements]);
 
+    const handleEscape = useCallback((e) => {
+        if (e.key === 'Escape' && isOpen && !isLoading) {
+            onCancel();
+        }
+    }, [isOpen, onCancel, isLoading]);
+
+    useEffect(() => {
         if (isOpen) {
+            previousActiveElement.current = document.activeElement;
             document.addEventListener('keydown', handleEscape);
-            // Focus confirm button when dialog opens
+            document.addEventListener('keydown', handleTabKey);
             setTimeout(() => confirmButtonRef.current?.focus(), 100);
-            // Prevent body scroll
             document.body.style.overflow = 'hidden';
         }
 
         return () => {
             document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('keydown', handleTabKey);
             document.body.style.overflow = 'unset';
+            if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
+                previousActiveElement.current.focus();
+            }
         };
-    }, [isOpen, onCancel, isLoading]);
+    }, [isOpen, handleEscape, handleTabKey]);
 
     if (!isOpen) return null;
 
@@ -78,16 +113,20 @@ const AlertDialog = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="alert-dialog-title"
+            aria-describedby="alert-dialog-message"
         >
-            <div style={{
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                width: '100%',
-                maxWidth: '400px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                animation: 'scaleIn 0.2s ease-out'
-            }} onClick={e => e.stopPropagation()}>
-                {/* Header */}
+            <div 
+                ref={dialogRef}
+                style={{
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    width: '100%',
+                    maxWidth: '400px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    animation: 'scaleIn 0.2s ease-out'
+                }} 
+                onClick={e => e.stopPropagation()}
+            >
                 <div style={{
                     display: 'flex',
                     alignItems: 'flex-start',
@@ -105,9 +144,9 @@ const AlertDialog = ({
                             justifyContent: 'center'
                         }}>
                             {isDanger ? (
-                                <FiTrash2 size={20} color="#DC2626" />
+                                <FiTrash2 size={20} color="#DC2626" aria-hidden="true" />
                             ) : (
-                                <FiAlertTriangle size={20} color="#D97706" />
+                                <FiAlertTriangle size={20} color="#D97706" aria-hidden="true" />
                             )}
                         </div>
                         <h3
@@ -123,6 +162,7 @@ const AlertDialog = ({
                         </h3>
                     </div>
                     <button
+                        ref={cancelButtonRef}
                         onClick={onCancel}
                         disabled={isLoading}
                         style={{
@@ -150,23 +190,24 @@ const AlertDialog = ({
                         }}
                         aria-label="Close dialog"
                     >
-                        <FiX size={20} />
+                        <FiX size={20} aria-hidden="true" />
                     </button>
                 </div>
 
-                {/* Content */}
                 <div style={{ padding: '1rem 1.5rem' }}>
-                    <p style={{
-                        color: '#4B5563',
-                        fontSize: '0.938rem',
-                        lineHeight: '1.6',
-                        margin: 0
-                    }}>
+                    <p 
+                        id="alert-dialog-message"
+                        style={{
+                            color: '#4B5563',
+                            fontSize: '0.938rem',
+                            lineHeight: '1.6',
+                            margin: 0
+                        }}
+                    >
                         {message}
                     </p>
                 </div>
 
-                {/* Footer */}
                 <div style={{
                     display: 'flex',
                     justifyContent: 'flex-end',
@@ -175,6 +216,7 @@ const AlertDialog = ({
                     borderTop: '1px solid #F3F4F6'
                 }}>
                     <button
+                        ref={cancelButtonRef}
                         onClick={onCancel}
                         disabled={isLoading}
                         style={{
@@ -236,7 +278,9 @@ const AlertDialog = ({
                                 borderTopColor: '#FFFFFF',
                                 borderRadius: '50%',
                                 animation: 'spin 0.8s linear infinite'
-                            }} />
+                            }} 
+                            aria-hidden="true"
+                            />
                         )}
                         {confirmText}
                     </button>
@@ -247,4 +291,3 @@ const AlertDialog = ({
 };
 
 export default AlertDialog;
-

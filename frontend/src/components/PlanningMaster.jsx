@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '../api';
 import { useDebounce } from '../utils/useDebounce';
+import withOptimisticUpdate from '../utils/optimisticUpdates';
 import { validatePlanningMaster } from '../utils/validation';
 import '../App.css';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import AlertDialog from './common/AlertDialog';
 import TextTooltip from './common/TextTooltip';
 import Combobox from './common/Combobox';
@@ -20,6 +23,11 @@ import BoxesCalculationReport from './BoxesCalculationReport';
 import CoreCalculationReport from './CoreCalculationReport';
 import SleeveCalculationReport from './SleeveCalculationReport';
 import { formatDate, formatDateForInput } from '../styles/sharedStyles';
+import usePagination from '../utils/usePagination';
+import useSortableData from '../utils/useSortableData';
+import useRowSelection from '../utils/useRowSelection';
+import Pagination from './common/Pagination';
+import SortableHeader from './common/SortableHeader';
 
 const PlanningMaster = ({ user }) => {
     // All available tabs with their permission pageId
@@ -60,7 +68,8 @@ const PlanningMaster = ({ user }) => {
         ItemCode: '',
         CustomerName: '',
         ScheduleQty: '',
-        PlanDate: ''
+        PlanDate: '',
+        DeliveryDate: ''
     });
 
     const [selectedId, setSelectedId] = useState(null);
@@ -69,6 +78,9 @@ const PlanningMaster = ({ user }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [errors, setErrors] = useState({});
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const importFileInputRef = useRef(null);
     
     // Tab state with URL persistence
     const [searchParams, setSearchParams] = useSearchParams();
@@ -121,58 +133,84 @@ const PlanningMaster = ({ user }) => {
         placeholderData: keepPreviousData,
     });
 
+    const {
+        currentPage,
+        totalPages,
+        pageSize,
+        totalRecords,
+        goToPage,
+        changePageSize,
+        resetToFirstPage
+    } = usePagination({ data: schedules, pageSize: 50, autoPaginate: true });
+
+    const { sortKey, sortOrder, handleSort } = useSortableData(schedules);
+
+    const { toggleRow, toggleAll, clearSelection, isSelected, isAllSelected, isSomeSelected, selectedCount, getSelectedRecords } = useRowSelection({ data: schedules, idField: 'ID' });
+
+    const displayData = useMemo(() => {
+        if (!sortKey || !schedules.length) {
+            const start = (currentPage - 1) * pageSize;
+            return schedules.slice(start, start + pageSize);
+        }
+        const sorted = [...schedules].sort((a, b) => {
+            let aVal = a[sortKey];
+            let bVal = b[sortKey];
+            if (aVal === null || aVal === undefined) aVal = '';
+            if (bVal === null || bVal === undefined) bVal = '';
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        const start = (currentPage - 1) * pageSize;
+        return sorted.slice(start, start + pageSize);
+    }, [schedules, sortKey, sortOrder, currentPage, pageSize]);
+
+    useEffect(() => {
+        resetToFirstPage();
+    }, [debouncedSearchTerm, resetToFirstPage]);
+
     // Mutations
-    const addMutation = useMutation({
-        mutationFn: (newSchedule) => api.post('/planning-master', newSchedule),
+    const optimistic = withOptimisticUpdate(queryClient, ['planningSchedules'], { idField: 'ID' });
+
+    const addMutation = useMutation(optimistic.add({
+        apiFn: (newSchedule) => api.post('/planning-master', newSchedule),
+        successMessage: 'Planning schedule added successfully',
         onSuccess: () => {
-            toast.success('Planning schedule added successfully');
-            // Freeze date and customer to the most recently submitted values
             const newFrozenDate = formData.PlanDate;
             const newFrozenCustomer = formData.CustomerName;
             
             setFrozenDate(newFrozenDate);
             setFrozenCustomer(newFrozenCustomer);
-            // Clear form but keep frozen date and customer
             setFormData(prev => ({
                 ItemCode: '',
                 CustomerName: newFrozenCustomer || prev.CustomerName,
                 ScheduleQty: '',
-                PlanDate: newFrozenDate || prev.PlanDate
+                PlanDate: newFrozenDate || prev.PlanDate,
+                DeliveryDate: ''
             }));
             setSelectedId(null);
             setIsEditing(false);
-            queryClient.invalidateQueries(['planningSchedules']);
-        },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to add planning schedule');
         }
-    });
+    }));
 
-    const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => api.put(`/planning-master/${id}`, data),
+    const updateMutation = useMutation(optimistic.update({
+        apiFn: ({ id, data }) => api.put(`/planning-master/${id}`, data),
+        successMessage: 'Planning schedule updated successfully',
         onSuccess: () => {
-            toast.success('Planning schedule updated successfully');
             handleClear();
-            queryClient.invalidateQueries(['planningSchedules']);
-        },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to update planning schedule');
         }
-    });
+    }));
 
-    const deleteMutation = useMutation({
-        mutationFn: (id) => api.delete(`/planning-master/${id}`),
+    const deleteMutation = useMutation(optimistic.remove({
+        apiFn: (id) => api.delete(`/planning-master/${id}`),
+        successMessage: 'Planning schedule deleted successfully!',
         onSuccess: () => {
-            toast.success('Planning schedule deleted successfully!');
             handleClear();
-            queryClient.invalidateQueries(['planningSchedules']);
-            setShowDeleteDialog(false);
-        },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to delete planning schedule');
             setShowDeleteDialog(false);
         }
-    });
+    }));
 
     useEffect(() => {
         if (isQueryError) {
@@ -189,17 +227,15 @@ const PlanningMaster = ({ user }) => {
         // Validate first using standard validation
         const validationErrors = validatePlanningMaster(formData);
         
-        // Additional validation: Check if ItemCode is from the dropdown
-        if (formData.ItemCode && formData.ItemCode.trim()) {
-            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode);
+        if (formData.ItemCode && formData.ItemCode.trim() && rawMaterials.length > 0) {
+            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode.trim());
             if (!isValidItemCode) {
                 validationErrors.ItemCode = 'Please select a valid Item Code from the dropdown';
             }
         }
         
-        // Additional validation: Check if CustomerName is from the dropdown
-        if (formData.CustomerName && formData.CustomerName.trim()) {
-            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName);
+        if (formData.CustomerName && formData.CustomerName.trim() && customers.length > 0) {
+            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName.trim());
             if (!isValidCustomer) {
                 validationErrors.CustomerName = 'Please select a valid Customer from the dropdown';
             }
@@ -222,17 +258,15 @@ const PlanningMaster = ({ user }) => {
         // Validate using standard validation
         const validationErrors = validatePlanningMaster(formData);
         
-        // Additional validation: Check if ItemCode is from the dropdown
-        if (formData.ItemCode && formData.ItemCode.trim()) {
-            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode);
+        if (formData.ItemCode && formData.ItemCode.trim() && rawMaterials.length > 0) {
+            const isValidItemCode = rawMaterials.some(item => item.RawMatCode === formData.ItemCode.trim());
             if (!isValidItemCode) {
                 validationErrors.ItemCode = 'Please select a valid Item Code from the dropdown';
             }
         }
         
-        // Additional validation: Check if CustomerName is from the dropdown
-        if (formData.CustomerName && formData.CustomerName.trim()) {
-            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName);
+        if (formData.CustomerName && formData.CustomerName.trim() && customers.length > 0) {
+            const isValidCustomer = customers.some(c => c.CustName === formData.CustomerName.trim());
             if (!isValidCustomer) {
                 validationErrors.CustomerName = 'Please select a valid Customer from the dropdown';
             }
@@ -261,13 +295,29 @@ const PlanningMaster = ({ user }) => {
         }
     };
 
+    const handleBulkDelete = async () => {
+        const selected = getSelectedRecords();
+        const results = await Promise.allSettled(selected.map(r => api.delete(`/planning-master/${r.ID}`)));
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        if (failed === 0) {
+            toast.success(`${succeeded} records deleted successfully`);
+        } else {
+            toast.error(`${succeeded} deleted, ${failed} failed`);
+        }
+        clearSelection();
+        queryClient.invalidateQueries(['planningSchedules']);
+        setShowBulkDeleteDialog(false);
+    };
+
     const handleClear = () => {
         // Keep the frozen date and customer when clearing the form
         setFormData({
             ItemCode: '',
             CustomerName: frozenCustomer || '',
             ScheduleQty: '',
-            PlanDate: frozenDate || ''
+            PlanDate: frozenDate || '',
+            DeliveryDate: ''
         });
         setSelectedId(null);
         setIsEditing(false);
@@ -281,13 +331,107 @@ const PlanningMaster = ({ user }) => {
             ItemCode: schedule.ItemCode || '',
             CustomerName: schedule.CustomerName || '',
             ScheduleQty: schedule.ScheduleQty || '',
-            PlanDate: formatDateForInput(schedule.PlanDate)
+            PlanDate: formatDateForInput(schedule.PlanDate),
+            DeliveryDate: schedule.DeliveryDate ? formatDateForInput(schedule.DeliveryDate) : ''
         });
         setErrors({});
     };
 
     // Search is now auto-triggered by debounce
     const handleSearchChange = (e) => setSearchTerm(e.target.value);
+
+    // Handle Excel import
+    const handleImportExcel = useCallback(async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+            toast.error('Please select a valid Excel file (.xlsx or .xls)');
+            return;
+        }
+
+        setImporting(true);
+        const fd = new FormData();
+        fd.append('file', file);
+
+        try {
+            const response = await api.post('/planning-master/import-excel', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            const { successCount, errorCount } = response.data;
+
+            if (errorCount > 0) {
+                toast.warning(`Import completed with ${successCount} records imported and ${errorCount} errors.`);
+            } else {
+                toast.success(`Successfully imported ${successCount} records!`);
+            }
+
+            queryClient.invalidateQueries({ queryKey: ['planningSchedules'] });
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to import Excel file');
+        } finally {
+            setImporting(false);
+            if (importFileInputRef.current) importFileInputRef.current.value = '';
+        }
+    }, [queryClient]);
+
+    // Handle Excel export
+    const handleExportExcel = useCallback(async () => {
+        if (!displayData || displayData.length === 0) {
+            toast.warning('No data to export');
+            return;
+        }
+
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Planning Schedules');
+
+            worksheet.columns = [
+                { header: 'Sr. No', key: '_srNo', width: 8 },
+                { header: 'Item Code', key: 'ItemCode', width: 20 },
+                { header: 'Customer Name', key: 'CustomerName', width: 25 },
+                { header: 'Schedule Qty', key: 'ScheduleQty', width: 15 },
+                { header: 'Plan Date', key: 'PlanDate', width: 15 },
+                { header: 'Delivery Date', key: 'DeliveryDate', width: 15 },
+            ];
+
+            displayData.forEach((record, index) => {
+                const row = {
+                    _srNo: index + 1,
+                    ItemCode: record.ItemCode || '',
+                    CustomerName: record.CustomerName || '',
+                    ScheduleQty: record.ScheduleQty || 0,
+                    PlanDate: record.PlanDate ? new Date(record.PlanDate).toLocaleDateString('en-GB') : '',
+                    DeliveryDate: record.DeliveryDate ? new Date(record.DeliveryDate).toLocaleDateString('en-GB') : '',
+                };
+                worksheet.addRow(row);
+            });
+
+            const headerRow = worksheet.getRow(1);
+            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0369A1' } };
+            headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+            headerRow.height = 24;
+
+            worksheet.eachRow((row, rowNumber) => {
+                row.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin' }, left: { style: 'thin' },
+                        bottom: { style: 'thin' }, right: { style: 'thin' },
+                    };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                });
+            });
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            saveAs(blob, `PlanningSchedules_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success('Excel file exported successfully!');
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error('Failed to export Excel file');
+        }
+    }, [displayData]);
 
     // Prepare options for Combobox
     const rawMaterialOptions = rawMaterials.map(item => ({
@@ -379,7 +523,7 @@ const PlanningMaster = ({ user }) => {
                     {/* Date */}
                     <div className="form-group">
                         <label htmlFor="PlanDate" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                            Date <span style={{ color: '#EF4444' }}>*</span>
+                            Plan Date <span style={{ color: '#EF4444' }}>*</span>
                             {frozenDate && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#059669' }}>🔒</span>}
                         </label>
                         <DatePicker
@@ -387,18 +531,54 @@ const PlanningMaster = ({ user }) => {
                             name="PlanDate"
                             value={formData.PlanDate}
                             onChange={handleChange}
-                            placeholder="Select date..."
+                            placeholder="Select plan date..."
                         />
                         {errors.PlanDate && <span style={{ color: '#EF4444', fontSize: '0.75rem', display: 'block', marginTop: '0.25rem' }}>{errors.PlanDate}</span>}
+                    </div>
+
+                    {/* Delivery Date */}
+                    <div className="form-group">
+                        <label htmlFor="DeliveryDate" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
+                            Delivery Date
+                        </label>
+                        <DatePicker
+                            id="DeliveryDate"
+                            name="DeliveryDate"
+                            value={formData.DeliveryDate}
+                            onChange={handleChange}
+                            placeholder="Select delivery date..."
+                        />
                     </div>
                 </div>
 
                 {/* Buttons */}
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button onClick={handleAdd} className="btn btn-primary">ADD</button>
-                    <button onClick={handleEdit} className="btn" style={{ backgroundColor: '#10B981', color: 'white' }}>EDIT</button>
-                    <button onClick={handleDeleteClick} className="btn" style={{ backgroundColor: '#EF4444', color: 'white' }}>DELETE</button>
+                    <button onClick={handleAdd} disabled={addMutation.isPending || updateMutation.isPending} className="btn btn-primary">{addMutation.isPending ? 'Adding...' : 'ADD'}</button>
+                    <button onClick={handleEdit} disabled={addMutation.isPending || updateMutation.isPending} className="btn" style={{ backgroundColor: '#10B981', color: 'white' }}>{updateMutation.isPending ? 'Updating...' : 'EDIT'}</button>
+                    <button onClick={handleDeleteClick} disabled={deleteMutation.isPending} className="btn" style={{ backgroundColor: '#EF4444', color: 'white' }}>DELETE</button>
                     <button onClick={handleClear} className="btn btn-secondary">CLEAR</button>
+                    <input
+                        type="file"
+                        ref={importFileInputRef}
+                        onChange={handleImportExcel}
+                        accept=".xlsx,.xls"
+                        style={{ display: 'none' }}
+                    />
+<button
+                        onClick={() => importFileInputRef.current?.click()}
+                        disabled={importing}
+                        className="btn btn-secondary"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                        {importing ? 'Importing...' : '📥 Import Excel'}
+                    </button>
+                    <button
+                        onClick={handleExportExcel}
+                        className="btn btn-success"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                        📤 Export Excel
+                    </button>
 
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <label style={{ fontWeight: '500', whiteSpace: 'nowrap', color: '#374151' }}>Search:</label>
@@ -411,12 +591,19 @@ const PlanningMaster = ({ user }) => {
 
             {/* Table Section */}
             <div className="section-container section-gray">
-                <h3 className="section-title gray">Planning Schedules ({schedules.length} records)</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 className="section-title gray">Planning Schedules ({totalRecords} records)</h3>
+                    {selectedCount > 0 && (
+                        <button onClick={() => setShowBulkDeleteDialog(true)} className="btn btn-danger" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
+                            Delete Selected ({selectedCount})
+                        </button>
+                    )}
+                </div>
 
                 {/* Standard HTML Table with scroll */}
                 <div style={{ 
                     border: '1px solid #E5E7EB', 
-                    borderRadius: '6px', 
+                    borderRadius: '6px 6px 0 0', 
                     overflow: 'auto',
                     maxHeight: '500px'
                 }}>
@@ -424,7 +611,7 @@ const PlanningMaster = ({ user }) => {
                         <div style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
                             Loading schedules...
                         </div>
-                    ) : schedules && schedules.length > 0 ? (
+                    ) : displayData && displayData.length > 0 ? (
                         <table style={{ 
                             width: '100%', 
                             borderCollapse: 'collapse',
@@ -437,33 +624,60 @@ const PlanningMaster = ({ user }) => {
                                 zIndex: 10
                             }}>
                                 <tr>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Sr. No</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Item Code</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Customer Name</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Qty</th>
-                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }}>Plan Date</th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151', width: '40px' }} scope="col">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAllSelected}
+                                            ref={el => { if (el) el.indeterminate = isSomeSelected; }}
+                                            onChange={() => toggleAll(displayData)}
+                                            aria-label="Select all rows on this page"
+                                            title="Select all on this page"
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                                        />
+                                    </th>
+                                    <th style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} scope="col">Sr. No</th>
+                                    <SortableHeader columnKey="ItemCode" label="Item Code" sortKey={sortKey} sortOrder={sortOrder} onSort={handleSort} style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} />
+                                    <SortableHeader columnKey="CustomerName" label="Customer Name" sortKey={sortKey} sortOrder={sortOrder} onSort={handleSort} style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} />
+                                    <SortableHeader columnKey="ScheduleQty" label="Qty" sortKey={sortKey} sortOrder={sortOrder} onSort={handleSort} style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} />
+                                    <SortableHeader columnKey="PlanDate" label="Plan Date" sortKey={sortKey} sortOrder={sortOrder} onSort={handleSort} style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} />
+                                    <SortableHeader columnKey="DeliveryDate" label="Delivery Date" sortKey={sortKey} sortOrder={sortOrder} onSort={handleSort} style={{ padding: '0.75rem 1rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB', fontSize: '0.875rem', color: '#374151' }} />
                                 </tr>
                             </thead>
                             <tbody>
-                                {schedules.map((schedule, index) => (
+                                {displayData.map((schedule, index) => (
                                     <tr 
                                         key={schedule.ID} 
                                         onClick={() => handleRowClick(schedule)}
                                         style={{
                                             borderBottom: '1px solid #E5E7EB',
-                                            backgroundColor: selectedId === schedule.ID ? '#DBEAFE' : 'white',
+                                            backgroundColor: isSelected(schedule.ID) ? '#FEF3C7' : selectedId === schedule.ID ? '#DBEAFE' : 'white',
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{index + 1}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected(schedule.ID)}
+                                                onChange={() => toggleRow(schedule.ID)}
+                                                aria-label={`Select row ${index + 1}`}
+                                                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                                            />
+                                        </td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{(currentPage - 1) * pageSize + index + 1}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.ItemCode} maxLength={20} /></td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem' }}><TextTooltip text={schedule.CustomerName} maxLength={25} /></td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'right' }}>{schedule.ScheduleQty}</td>
                                         <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{formatDate(schedule.PlanDate)}</td>
+                                        <td style={{ padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.875rem', textAlign: 'center' }}>{schedule.DeliveryDate ? formatDate(schedule.DeliveryDate) : '-'}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    ) : isQueryError ? (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#EF4444' }}>
+                            <p style={{ fontWeight: '500' }}>Failed to load schedules</p>
+                            <button onClick={() => queryClient.invalidateQueries(['planningSchedules'])} className="btn btn-secondary" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>Retry</button>
+                        </div>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontStyle: 'italic' }}>
                             No records found
@@ -471,18 +685,15 @@ const PlanningMaster = ({ user }) => {
                     )}
                 </div>
                 
-                {/* Row count footer */}
-                <div style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.75rem',
-                    color: '#6B7280',
-                    backgroundColor: '#F9FAFB',
-                    borderRadius: '0 0 6px 6px',
-                    border: '1px solid #E5E7EB',
-                    borderTop: 'none'
-                }}>
-                    Showing {schedules?.length || 0} rows
-                </div>
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalRecords={totalRecords}
+                    pageSize={pageSize}
+                    onPageChange={goToPage}
+                    onPageSizeChange={changePageSize}
+                    showPageSizeSelector
+                />
 
                 {selectedId && (
                     <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#DBEAFE', borderRadius: '0.375rem', fontSize: '0.875rem', color: '#1E40AF' }}>
@@ -500,6 +711,8 @@ const PlanningMaster = ({ user }) => {
                 confirmText="Delete"
                 isDanger={true}
             />
+            <AlertDialog isOpen={showBulkDeleteDialog} title={`Delete ${selectedCount} Records`} message={`Are you sure you want to delete ${selectedCount} selected records? This action cannot be undone.`}
+                onConfirm={handleBulkDelete} onCancel={() => setShowBulkDeleteDialog(false)} confirmText="Delete All" isDanger={true} />
             </>
             )}
         </div>
@@ -507,3 +720,4 @@ const PlanningMaster = ({ user }) => {
 };
 
 export default PlanningMaster;
+

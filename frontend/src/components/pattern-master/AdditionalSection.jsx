@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { labelStyle, inputStyle, textareaStyle } from './styles';
 import DatePicker from '../common/DatePicker';
+import CharacterCounter from '../common/CharacterCounter';
 import { ClipboardType } from 'lucide-react';
 
 const AdditionalSection = ({ data, onChange }) => {
@@ -38,9 +39,11 @@ const AdditionalSection = ({ data, onChange }) => {
                         name="comment"
                         value={data.comment}
                         onChange={onChange}
+                        maxLength={500}
                         style={textareaStyle}
                         placeholder="Enter any additional comments"
                     />
+                    <CharacterCounter value={data.comment} maxLength={500} showAt={400} />
                 </div>
             </div>
         </div>

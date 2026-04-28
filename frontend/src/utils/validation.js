@@ -127,8 +127,10 @@ export const validatePlanningMaster = (formData) => {
 
     // Plan Date (Required)
     if (!formData.PlanDate) {
-        errors.PlanDate = 'Date is required';
+        errors.PlanDate = 'Plan Date is required';
     }
+
+    // Delivery Date (Optional - no validation needed)
 
     return errors;
 };

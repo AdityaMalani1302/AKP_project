@@ -35,7 +35,6 @@ const productionDashboardRoutes = require('./routes/productionDashboardRoutes');
 const financeDashboardRoutes = require('./routes/financeDashboardRoutes');
 const arDashboardRoutes = require('./routes/arDashboardRoutes');
 const itManagementRoutes = require('./routes/itManagementRoutes');
-const marketingRoutes = require('./routes/marketingRoutes');
 const masterRoutes = require('./routes/masterRoutes');
 const planningRoutes = require('./routes/planningRoutes');
 const reportRoutes = require('./routes/reportRoutes');
@@ -49,6 +48,8 @@ const whatsappRoutes = require('./routes/whatsappRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+app.set('trust proxy', 1);
 
 // Security & Optimization Middleware
 app.use(helmet({
@@ -75,13 +76,14 @@ app.use(compression());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
-    process.env.CORS_ORIGIN,      // e.g., http://192.168.1.10:5173
-    process.env.FRONTEND_URL       // Production frontend URL
+    process.env.CORS_ORIGIN,       // e.g., http://192.168.1.10:5173
+    process.env.FRONTEND_URL,      // Production frontend URL (Vercel or Cloudflare)
+    process.env.VERCEL_URL,        // Exact Vercel deployment URL
+    process.env.TUNNEL_URL         // Exact Cloudflare tunnel URL
 ].filter(Boolean);
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
         if (allowedOrigins.includes(origin)) {
@@ -89,18 +91,7 @@ app.use(cors({
         }
 
         // Allow local network IPs (IPv4)
-        // Regex matches http://192.168.x.x(:port)
         if (/^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)) {
-            return callback(null, true);
-        }
-
-        // Allow Vercel preview deployments (*.vercel.app)
-        if (/^https:\/\/.*\.vercel\.app$/.test(origin)) {
-            return callback(null, true);
-        }
-
-        // Allow Cloudflare tunnel domains (*.trycloudflare.com)
-        if (/^https:\/\/.*\.trycloudflare\.com$/.test(origin)) {
             return callback(null, true);
         }
 
@@ -171,6 +162,20 @@ app.use((req, res, next) => {
 // Performance Monitoring Middleware (tracks API response times)
 app.use(performanceMonitor);
 
+// CSRF protection: verify Origin header on state-changing requests
+app.use('/api', (req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    const origin = req.get('origin');
+    if (!origin) return next();
+    const isAllowed = allowedOrigins.includes(origin) ||
+        /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin) ||
+        /^https?:\/\/(.*\.)?akpfoundries\.com$/.test(origin);
+    if (!isAllowed) {
+        return res.status(403).json({ error: 'Forbidden: origin not allowed' });
+    }
+    next();
+});
+
 // Apply Global Rate Limiting to all API routes
 app.use('/api', apiLimiter);
 
@@ -185,7 +190,6 @@ app.use('/api/production-dashboard', verifyToken, productionDashboardRoutes);
 app.use('/api/finance-dashboard', verifyToken, financeDashboardRoutes);
 app.use('/api/ar-dashboard', verifyToken, arDashboardRoutes);
 app.use('/api/it-management', verifyToken, itManagementRoutes);
-app.use('/api/marketing', verifyToken, marketingRoutes);
 app.use('/api/master', verifyToken, masterRoutes);
 app.use('/api/planning', verifyToken, planningRoutes);
 app.use('/api/reports', verifyToken, reportRoutes);

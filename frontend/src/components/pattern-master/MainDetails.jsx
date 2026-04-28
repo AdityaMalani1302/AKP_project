@@ -25,14 +25,14 @@ const MainDetails = ({
 
     // Load all options on mount
     useEffect(() => {
+        const controller = new AbortController();
         const fetchOptions = async () => {
             try {
                 const [customersRes, productsRes] = await Promise.all([
-                    api.get('/customers?search='),
-                    api.get('/products?search=')
+                    api.get('/customers?search=', { signal: controller.signal }),
+                    api.get('/products?search=', { signal: controller.signal })
                 ]);
                 setCustomers(customersRes.data.map(c => ({ value: c.CustId, label: c.CustName })));
-                // Include GradeId and GradeName from products
                 setProducts(productsRes.data.map(p => ({
                     value: p.ProdId,
                     label: p.InternalPartNo || `Product ${p.ProdId}`,
@@ -41,10 +41,11 @@ const MainDetails = ({
                     gradeName: p.GradeName
                 })));
             } catch (err) {
-                console.error('Error loading options:', err);
+                if (!controller.signal.aborted) console.error('Error loading options:', err);
             }
         };
         fetchOptions();
+        return () => controller.abort();
     }, []);
 
     const handleCustomerChange = (selectedValue) => {
@@ -187,7 +188,7 @@ const MainDetails = ({
 
                 {partRows.map((row, index) => (
                     <div
-                        key={index}
+                        key={row.partNoOption?.value ?? `new-${index}`}
                         style={{
                             display: 'grid',
                             gridTemplateColumns: '1.5fr 1.5fr 1fr 0.8fr 0.8fr 0.8fr 50px',
@@ -253,6 +254,7 @@ const MainDetails = ({
                             )}
                             <input
                                 type="number"
+                                min="0"
                                 placeholder="Qty"
                                 value={row.qty}
                                 onChange={(e) => onPartRowChange(index, 'qty', e.target.value)}
@@ -268,6 +270,7 @@ const MainDetails = ({
                             <input
                                 type="number"
                                 step="0.01"
+                                min="0"
                                 placeholder="Wt"
                                 value={row.weight}
                                 onChange={(e) => onPartRowChange(index, 'weight', e.target.value)}

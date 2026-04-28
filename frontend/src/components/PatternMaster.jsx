@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'sonner';
@@ -53,7 +53,7 @@ const PatternMaster = ({ user }) => {
         return allTabs.filter(tab => allowedPages.includes(tab.pageId));
     };
 
-    const tabs = getVisibleTabs();
+    const tabs = useMemo(() => getVisibleTabs(), [user]);
 
     // Read tab from URL, default to first visible tab
     const urlTab = searchParams.get('tab');
@@ -113,10 +113,8 @@ const PatternMaster = ({ user }) => {
     });
 
     const [castingData, setCastingData] = useState({
-        Casting_Material_Grade: '',
         Moulding_Box_Size: '',
         Total_Weight: '',
-        No_Of_Cavities: '',
         Bunch_Wt: '',
         YieldPercent: ''
     });
@@ -180,9 +178,6 @@ const PatternMaster = ({ user }) => {
     const [errors, setErrors] = useState({});
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
     // Records table state
     // patterns state is managed by React Query now
     const [selectedId, setSelectedId] = useState(null);
@@ -217,39 +212,43 @@ const PatternMaster = ({ user }) => {
         enabled: true
     });
 
-    // Fetch sleeves on mount
     useEffect(() => {
+        const controller = new AbortController();
         const fetchSleeves = async () => {
             try {
-                const response = await api.get('/sleeves');
+                const response = await api.get('/sleeves', { signal: controller.signal });
                 const formatted = response.data.map(sleeve => ({
                     value: sleeve.RawMatID,
                     label: sleeve.RawMatName
                 }));
                 setSleeveOptions(formatted);
             } catch (error) {
-                console.error('Error fetching sleeves:', error);
-                toast.error('Failed to load sleeve options');
+                if (!controller.signal.aborted) {
+                    console.error('Error fetching sleeves:', error);
+                    toast.error('Failed to load sleeve options');
+                }
             }
         };
         fetchSleeves();
+        return () => controller.abort();
     }, []);
 
-    // Fetch pattern numbers for Edit dropdown
     useEffect(() => {
+        const controller = new AbortController();
         const fetchPatternNumbers = async () => {
             try {
-                const response = await api.get('/pattern-master/numbers');
+                const response = await api.get('/pattern-master/numbers', { signal: controller.signal });
                 const formatted = response.data.map(p => ({
                     value: p.PatternId,
                     label: p.PatternNo || `Pattern ${p.PatternId}`
                 }));
                 setPatternNumbers(formatted);
             } catch (error) {
-                console.error('Error fetching pattern numbers:', error);
+                if (!controller.signal.aborted) console.error('Error fetching pattern numbers:', error);
             }
         };
         fetchPatternNumbers();
+        return () => controller.abort();
     }, [refreshTrigger]);
 
     // React Query for fetching patterns
@@ -274,16 +273,14 @@ const PatternMaster = ({ user }) => {
         mutationFn: (newPattern) => api.post('/pattern-master', newPattern),
         onSuccess: (data) => {
             toast.success(`Pattern added successfully! Pattern ID: ${data.data.patternId}`);
-            queryClient.invalidateQueries(['patterns']);
-            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
-            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            queryClient.invalidateQueries({ queryKey: ['patterns'] });
+            queryClient.invalidateQueries({ queryKey: ['pattern-master', 'stats'] });
+            queryClient.invalidateQueries({ queryKey: ['unified-patterns'] });
             setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
-            const errorMsg = error.response?.data?.error || 'Failed to add pattern';
-            toast.error(errorMsg);
-            setError(errorMsg);
+            toast.error(error.response?.data?.error || 'Failed to add pattern');
         }
     });
 
@@ -291,16 +288,14 @@ const PatternMaster = ({ user }) => {
         mutationFn: ({ id, data }) => api.put(`/pattern-master/${id}`, data),
         onSuccess: (data, variables) => {
             toast.success(`Pattern updated successfully! Pattern ID: ${variables.id}`);
-            queryClient.invalidateQueries(['patterns']);
-            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
-            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            queryClient.invalidateQueries({ queryKey: ['patterns'] });
+            queryClient.invalidateQueries({ queryKey: ['pattern-master', 'stats'] });
+            queryClient.invalidateQueries({ queryKey: ['unified-patterns'] });
             setRefreshTrigger(prev => prev + 1);
             handleClear();
         },
         onError: (error) => {
-            const errorMsg = error.response?.data?.error || 'Failed to update pattern';
-            toast.error(errorMsg);
-            setError(errorMsg);
+            toast.error(error.response?.data?.error || 'Failed to update pattern');
         }
     });
 
@@ -308,9 +303,9 @@ const PatternMaster = ({ user }) => {
         mutationFn: (id) => api.delete(`/pattern-master/${id}`),
         onSuccess: () => {
             toast.success('Pattern deleted successfully!');
-            queryClient.invalidateQueries(['patterns']);
-            queryClient.invalidateQueries(['pattern-master', 'stats']); // Refresh pattern count
-            queryClient.invalidateQueries(['unified-patterns']); // Refresh Unified Records Table
+            queryClient.invalidateQueries({ queryKey: ['patterns'] });
+            queryClient.invalidateQueries({ queryKey: ['pattern-master', 'stats'] });
+            queryClient.invalidateQueries({ queryKey: ['unified-patterns'] });
             setRefreshTrigger(prev => prev + 1);
             handleClear(); // Reset all form fields after deletion
             setShowDeleteDialog(false);
@@ -387,12 +382,9 @@ const PatternMaster = ({ user }) => {
             Core_Box_Pieces: data.Core_Box_Pieces || ''
         });
 
-        // Populate Casting Details
         setCastingData({
-            Casting_Material_Grade: data.Casting_Material_Grade || '',
             Moulding_Box_Size: data.Moulding_Box_Size || '',
             Total_Weight: data.Total_Weight || '',
-            No_Of_Cavities: data.No_Of_Cavities || '',
             Bunch_Wt: data.Bunch_Wt || '',
             YieldPercent: data.YieldPercent || ''
         });
@@ -475,7 +467,7 @@ const PatternMaster = ({ user }) => {
             const formattedSleeves = sleeves.map(sleeve => ({
                 sleeve_name: sleeve.sleeve_name || '',
                 // Convert sleeve_type_size to number for proper matching with sleeveOptions
-                sleeve_type_size: sleeve.sleeve_type_size ? parseInt(sleeve.sleeve_type_size) || sleeve.sleeve_type_size : '',
+                sleeve_type_size: sleeve.sleeve_type_size ? parseInt(sleeve.sleeve_type_size, 10) || sleeve.sleeve_type_size : '',
                 // Keep the display name for the SearchableSelect to show
                 sleeve_type_size_name: sleeve.sleeve_type_size_name || '',
                 quantity: sleeve.quantity || ''
@@ -517,8 +509,8 @@ const PatternMaster = ({ user }) => {
             No_Of_Core_Box_Set: '', Core_Box_Pieces: ''
         });
         setCastingData({
-            Casting_Material_Grade: '', Moulding_Box_Size: '', Total_Weight: '',
-            No_Of_Cavities: '', Bunch_Wt: '', YieldPercent: ''
+            Moulding_Box_Size: '', Total_Weight: '',
+            Bunch_Wt: '', YieldPercent: ''
         });
         setCoreDetailsData({
             Core_Wt: '',
@@ -663,10 +655,11 @@ const PatternMaster = ({ user }) => {
         setPartRows(prev => prev.filter((_, i) => i !== index));
     }, []);
 
+    const isMutating = addMutation.isPending || updateMutation.isPending;
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setError(null);
+        if (isMutating) return;
         setErrors({});
 
         // 1. Prepare Data for Validation (Merging split states into one object for validation function)
@@ -688,13 +681,10 @@ const PatternMaster = ({ user }) => {
         const validationErrors = validatePatternMaster(validationPayload);
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
-            setLoading(false);
-            // Scroll to top or show alert
             toast.error("Please complete all required fields before submitting.");
             return;
         }
 
-        try {
             // Generate legacy Core_Type string from coreDetailsData for backward compatibility
             const coreTypeStringParts = [];
             const hasAnyShell = coreDetailsData.Core_Type?.shell || false;
@@ -769,27 +759,16 @@ const PatternMaster = ({ user }) => {
                 }))
             };
 
-            // Legacy support: Fill top-level Part_No and Product_Name from first row
             if (submissionData.parts.length > 0) {
                 submissionData.Part_No = submissionData.parts[0].partNo;
                 submissionData.Product_Name = submissionData.parts[0].partNo;
             }
 
-            // Determine whether to POST (add) or PUT (update)
             if (isEditing && selectedId) {
                 updateMutation.mutate({ id: selectedId, data: submissionData });
             } else {
                 addMutation.mutate(submissionData);
             }
-
-        } catch (err) {
-            console.error('Error preparing submission:', err);
-            const errorMsg = 'An unexpected error occurred';
-            setError(errorMsg);
-            toast.error(errorMsg);
-        } finally {
-            setLoading(false);
-        }
     };
 
 
@@ -832,19 +811,9 @@ const PatternMaster = ({ user }) => {
                         <div style={{ flex: 1 }}>
                             <Combobox
                                 value={selectedId || ''}
-                                onChange={async (patternId) => {
+                                onChange={(patternId) => {
                                     if (patternId) {
-                                        const pattern = patternNumbers.find(p => p.value === patternId);
-                                        if (pattern) {
-                                            // Load pattern details
-                                            try {
-                                                const response = await api.get(`/pattern-master/${patternId}`);
-                                                handleRowClick(response.data);
-                                            } catch (err) {
-                                                console.error('Error loading pattern:', err);
-                                                toast.error('Failed to load pattern for editing');
-                                            }
-                                        }
+                                        handleRowClick({ PatternId: patternId });
                                     }
                                 }}
                                 options={patternNumbers}
@@ -908,10 +877,9 @@ const PatternMaster = ({ user }) => {
 
                         // State
                         errors={errors}
-                        loading={loading}
+                        loading={isMutating}
                         isEditing={isEditing}
                         selectedId={selectedId}
-                        error={error}
                     />
 
                     {/* Unified Records Table - Shows patterns with expandable parts/sleeves */}

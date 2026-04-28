@@ -61,8 +61,8 @@ const LabMaster = ({ user }) => {
 
     const tabs = getVisibleTabs();
     
-    // Read tab from URL, default to 'labMaster'
-    const activeTab = searchParams.get('tab') || 'labMaster';
+    const urlTab = searchParams.get('tab');
+    const activeTab = (urlTab && tabs.some(t => t.id === urlTab)) ? urlTab : (tabs[0]?.id || 'labMaster');
     
     // Handler to change tab and update URL
     const setActiveTab = useCallback((tab) => {

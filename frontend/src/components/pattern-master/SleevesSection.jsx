@@ -20,7 +20,7 @@ const SleevesSection = ({
             {/* Dynamic Sleeve Rows */}
             {sleeveRows.map((row, index) => (
                 <div
-                    key={index}
+                    key={row.SleeveRowId ?? `new-${index}`}
                     style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr 120px 80px',
@@ -56,7 +56,7 @@ const SleevesSection = ({
                         <SearchableSelect
                             options={
                                 // Ensure currently selected value shows even if not in sleeveOptions yet
-                                row.sleeve_type_size && row.sleeve_type_size_name && !sleeveOptions.find(opt => opt.value == row.sleeve_type_size)
+                                row.sleeve_type_size && row.sleeve_type_size_name && !sleeveOptions.find(opt => String(opt.value) === String(row.sleeve_type_size))
                                     ? [{ value: row.sleeve_type_size, label: row.sleeve_type_size_name }, ...sleeveOptions]
                                     : sleeveOptions
                             }
@@ -74,6 +74,7 @@ const SleevesSection = ({
                         <label style={labelStyle}>Quantity</label>
                         <input
                             type="number"
+                            min="0"
                             value={row.quantity}
                             onChange={(e) => onSleeveRowChange(index, 'quantity', e.target.value)}
                             placeholder="Qty"

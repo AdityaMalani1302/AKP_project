@@ -6,19 +6,21 @@ import './index.css'
 
 // Register Service Worker for offline caching (production only)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  let swUpdateInterval;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('SW registered:', registration.scope);
-        
-        // Check for updates periodically
-        setInterval(() => {
+        swUpdateInterval = setInterval(() => {
           registration.update();
-        }, 60 * 60 * 1000); // Check every hour
+        }, 60 * 60 * 1000);
       })
       .catch((error) => {
         console.log('SW registration failed:', error);
       });
+  });
+  window.addEventListener('unload', () => {
+    if (swUpdateInterval) clearInterval(swUpdateInterval);
   });
 }
 

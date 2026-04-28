@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const { loginSchema, registerSchema, validateBody } = require('../utils/validators');
+const { authLimiter } = require('../middleware/rateLimiter');
 const authController = require('../controllers/authController');
 
 // --- Routes ---
@@ -10,7 +11,7 @@ const authController = require('../controllers/authController');
 router.post('/register', verifyToken, requireRole('admin'), validateBody(registerSchema), authController.register);
 
 // Login
-router.post('/login', validateBody(loginSchema), authController.login);
+router.post('/login', authLimiter, validateBody(loginSchema), authController.login);
 
 // Logout (requires authentication)
 router.post('/logout', verifyToken, authController.logout);

@@ -73,10 +73,16 @@ const Layout = ({ children, user, onLogout }) => {
     const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
     const closeSidebar = () => setSidebarOpen(false);
 
-    // Calculate main content margin
-    // Desktop: 260px (Open) vs 80px (Collapsed)
-    // Mobile: 0 (Fixed Sidebar Overlay)
-    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+    const [isDesktop, setIsDesktop] = useState(
+        typeof window !== 'undefined' && window.innerWidth >= 768
+    );
+
+    useEffect(() => {
+        const onResize = () => setIsDesktop(window.innerWidth >= 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
     const mainMargin = isDesktop ? (sidebarOpen ? '260px' : '80px') : '0';
 
     return (

@@ -5,7 +5,6 @@ import {
     FiDatabase,
     FiSettings,
     FiLogOut,
-    FiPlusSquare,
     FiBox,
     FiX,
     FiCalendar,
@@ -46,7 +45,6 @@ const NAV_ITEMS = [
     { path: '/quality-management-system', pageId: 'quality-management-system', label: 'QMS', icon: FiActivity },
     { path: '/it-management', pageId: 'it-management', label: 'IT Management', icon: FiMonitor },
     { path: '/database-explorer', pageId: 'database-explorer', label: 'Database Explorer', icon: FiDatabase },
-    { path: '/marketing', pageId: 'marketing', label: 'Marketing', icon: FiPlusSquare },
 ];
 
 const Sidebar = ({ user, onLogout, isOpen, onClose }) => {

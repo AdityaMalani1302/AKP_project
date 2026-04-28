@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Command } from 'cmdk';
 import './Combobox.css';
 
-const Combobox = ({ options = [], value, onChange, placeholder, label, disabled = false }) => {
+const Combobox = ({ options = [], value, onChange, placeholder, label, disabled = false, 'aria-required': ariaRequired, 'aria-invalid': ariaInvalid, 'aria-describedby': ariaDescribedBy }) => {
     const [open, setOpen] = useState(false);
     const inputRef = useRef(null);
     const wrapperRef = useRef(null);
@@ -63,8 +63,17 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            onChange(inputValue);
-            setOpen(false);
+            const filtered = getFilteredOptions();
+            // If user typed something and there are filtered matches, select the first one
+            if (inputValue && filtered.length > 0) {
+                handleSelectOption(filtered[0].value);
+            } else if (filtered.length === 1) {
+                handleSelectOption(filtered[0].value);
+            } else {
+                const displayVal = getDisplayValue(value);
+                setInputValue(displayVal);
+                setOpen(false);
+            }
         } else if (e.key === 'Escape') {
             setOpen(false);
         }
@@ -89,19 +98,17 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
     const selectedOption = uniqueOptions.find(opt => opt.value == value);
     const selectedLabel = selectedOption ? selectedOption.label : '';
 
-    const searchValue = inputValue != null ? String(inputValue).toLowerCase() : '';
-
-    // If the input value matches the currently selected option's label or the current display value,
-    // show all options. Otherwise, filter based on the search value.
-    const currentDisplayValue = getDisplayValue(value);
-    const showAll = (selectedLabel && inputValue === selectedLabel) || (currentDisplayValue && inputValue === currentDisplayValue);
-
-    // Filter and limit to 100 for display
-    const filteredOptions = React.useMemo(() => {
+    // Filter options based on search input - always filter while typing
+    // When no search input, show first 100 options
+    const getFilteredOptions = () => {
+        const search = inputValue ? inputValue.toLowerCase() : '';
+        if (!search) {
+            return uniqueOptions.slice(0, 100);
+        }
         return uniqueOptions
-            .filter(opt => showAll || (opt.label && opt.label.toLowerCase().includes(searchValue)))
+            .filter(opt => opt.label && opt.label.toLowerCase().includes(search))
             .slice(0, 100);
-    }, [uniqueOptions, showAll, searchValue]);
+    };
 
     return (
         <div className="combobox-wrapper" ref={wrapperRef}>
@@ -120,8 +127,10 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
                         placeholder={placeholder}
                         className="combobox-text-input"
                         disabled={disabled}
+                        aria-required={ariaRequired}
+                        aria-invalid={ariaInvalid}
+                        aria-describedby={ariaDescribedBy}
                     />
-                    {/* Clear button - shows only when there's a value */}
                     {value && !disabled && (
                         <span
                             className="combobox-clear"
@@ -132,6 +141,8 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
                                 setOpen(false);
                             }}
                             title="Clear selection"
+                            role="button"
+                            aria-label="Clear selection"
                         >
                             ✕
                         </span>
@@ -151,10 +162,10 @@ const Combobox = ({ options = [], value, onChange, placeholder, label, disabled 
                     </span>
                 </div>
 
-                {open && filteredOptions.length > 0 && (
+                {open && getFilteredOptions().length > 0 && (
                     <div className="combobox-content">
                         <Command.List className="combobox-list">
-                            {filteredOptions.map((option) => (
+                            {getFilteredOptions().map((option) => (
                                 <Command.Item
                                     key={option.value}
                                     value={option.value}

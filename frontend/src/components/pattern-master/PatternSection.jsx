@@ -11,17 +11,18 @@ const PatternSection = ({ data, onChange, errors = {} }) => {
     // State for all suppliers
     const [suppliers, setSuppliers] = useState([]);
 
-    // Load all suppliers on mount
     useEffect(() => {
+        const controller = new AbortController();
         const fetchSuppliers = async () => {
             try {
-                const res = await api.get('/suppliers?search=');
+                const res = await api.get('/suppliers?search=', { signal: controller.signal });
                 setSuppliers(res.data.map(s => ({ value: s.SupId, label: s.SupName })));
             } catch (err) {
-                console.error('Error loading suppliers:', err);
+                if (!controller.signal.aborted) console.error('Error loading suppliers:', err);
             }
         };
         fetchSuppliers();
+        return () => controller.abort();
     }, []);
 
     const handleMakerChange = (selectedValue) => {

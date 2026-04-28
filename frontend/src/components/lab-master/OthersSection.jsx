@@ -1,5 +1,6 @@
 import React from 'react';
 import { labelStyle, inputStyle, selectStyle } from './styles';
+import CharacterCounter from '../common/CharacterCounter';
 
 const OthersSection = ({ data, onChange }) => {
     return (
@@ -45,6 +46,7 @@ const OthersSection = ({ data, onChange }) => {
                         name="Remarks"
                         value={data.Remarks || ''}
                         onChange={onChange}
+                        maxLength={500}
                         style={{
                             ...inputStyle,
                             minHeight: '80px',
@@ -53,6 +55,7 @@ const OthersSection = ({ data, onChange }) => {
                         }}
                         placeholder="Any additional remarks..."
                     />
+                    <CharacterCounter value={data.Remarks || ''} maxLength={500} showAt={400} />
                 </div>
             </div>
         </div>

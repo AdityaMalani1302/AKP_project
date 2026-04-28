@@ -1,0 +1,42 @@
+# Environment files (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Debug output
+debug_output.txt
+
+# Uploads (user-generated content)
+uploads/
+
+# Reports (generated files)
+reports/
+
+# Test coverage
+coverage/
+
+# Misc
+*.tgz
+.cache/

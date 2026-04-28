@@ -1,8 +1,28 @@
-import React from 'react';
-
-import { FiMenu } from 'react-icons/fi';
+import React, { useState, useRef, useEffect } from 'react';
+import { FiMenu, FiUser, FiSettings, FiLogOut, FiChevronDown } from 'react-icons/fi';
 
 const Header = ({ user, onMenuClick }) => {
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') setDropdownOpen(false);
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setDropdownOpen(prev => !prev);
+        }
+    };
+
     return (
         <header
             style={{
@@ -19,9 +39,7 @@ const Header = ({ user, onMenuClick }) => {
             }}
             role="banner"
         >
-            {/* Left Section - Sidebar Toggle + Title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                {/* Sidebar Toggle Button */}
                 <button
                     onClick={onMenuClick}
                     style={{
@@ -46,31 +64,152 @@ const Header = ({ user, onMenuClick }) => {
                 </h2>
             </div>
 
-            {/* Right Section */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {/* User Profile */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }} role="complementary" aria-label="User information">
-                    <div
+                <div ref={dropdownRef} style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setDropdownOpen(prev => !prev)}
+                        onKeyDown={handleKeyDown}
+                        aria-expanded={dropdownOpen}
+                        aria-haspopup="menu"
+                        aria-label={`User menu for ${user?.username}`}
                         style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            backgroundColor: '#E0E7FF',
-                            color: '#4F46E5',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: '600',
-                            fontSize: '0.875rem'
+                            gap: '0.75rem',
+                            padding: '0.5rem',
+                            background: dropdownOpen ? '#F3F4F6' : 'transparent',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.15s'
                         }}
-                        aria-label={`User avatar for ${user?.username}`}
                     >
-                        {user?.username?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="desktop-only" style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#111827' }}>{user?.username}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'capitalize' }}>{user?.role}</span>
-                    </div>
+                        <div
+                            style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: '#E0E7FF',
+                                color: '#4F46E5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: '600',
+                                fontSize: '0.875rem'
+                            }}
+                        >
+                            {user?.username?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="desktop-only" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#111827' }}>{user?.username}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#6B7280', textTransform: 'capitalize' }}>{user?.role}</span>
+                        </div>
+                        <FiChevronDown
+                            size={16}
+                            style={{
+                                color: '#6B7280',
+                                transition: 'transform 0.2s',
+                                transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                            }}
+                            aria-hidden="true"
+                        />
+                    </button>
+
+                    {dropdownOpen && (
+                        <div
+                            role="menu"
+                            aria-label="User menu"
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '0.5rem',
+                                backgroundColor: 'white',
+                                borderRadius: '0.5rem',
+                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                                border: '1px solid #E5E7EB',
+                                minWidth: '180px',
+                                overflow: 'hidden',
+                                zIndex: 100
+                            }}
+                        >
+                            <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E5E7EB' }}>
+                                <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '500', color: '#111827' }}>{user?.username}</p>
+                                <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#6B7280' }}>{user?.role}</p>
+                            </div>
+                            <button
+                                role="menuitem"
+                                onClick={() => { setDropdownOpen(false); }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    color: '#374151',
+                                    textAlign: 'left',
+                                    transition: 'background-color 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                                <FiUser size={16} aria-hidden="true" />
+                                Profile
+                            </button>
+                            <button
+                                role="menuitem"
+                                onClick={() => { setDropdownOpen(false); }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    width: '100%',
+                                    padding: '0.75rem 1rem',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    fontSize: '0.875rem',
+                                    color: '#374151',
+                                    textAlign: 'left',
+                                    transition: 'background-color 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                                <FiSettings size={16} aria-hidden="true" />
+                                Settings
+                            </button>
+                            <div style={{ borderTop: '1px solid #E5E7EB' }}>
+                                <button
+                                    role="menuitem"
+                                    onClick={() => { setDropdownOpen(false); onMenuClick?.(); }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        width: '100%',
+                                        padding: '0.75rem 1rem',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        color: '#DC2626',
+                                        textAlign: 'left',
+                                        transition: 'background-color 0.15s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FEF2F2'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <FiLogOut size={16} aria-hidden="true" />
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

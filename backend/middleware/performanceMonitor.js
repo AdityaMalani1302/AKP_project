@@ -53,7 +53,6 @@ const performanceMonitor = (req, res, next) => {
             logData.username = req.user.username;
         }
 
-        // Log based on duration thresholds
         if (durationMs > THRESHOLDS.CRITICAL) {
             logger.error(`[PERFORMANCE] CRITICAL: Slow request`, logData);
         } else if (durationMs > THRESHOLDS.ERROR) {
@@ -61,17 +60,11 @@ const performanceMonitor = (req, res, next) => {
         } else if (durationMs > THRESHOLDS.WARNING) {
             logger.warn(`[PERFORMANCE] Slow request`, logData);
         } else {
-            logger.info(`[PERFORMANCE] Request completed`, logData);
+            logger.debug(`[PERFORMANCE] Request completed`, logData);
         }
     };
 
 next();
-};
-
-module.exports = {
-    performanceMonitor,
-    THRESHOLDS
-};
 };
 
 module.exports = {

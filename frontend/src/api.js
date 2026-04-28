@@ -11,4 +11,10 @@ const api = axios.create({
     withCredentials: true
 });
 
+api.interceptors.request.use(config => {
+    const db = localStorage.getItem('selectedDatabase') || 'IcSoftVer3';
+    config.headers['x-database'] = db;
+    return config;
+});
+
 export default api;

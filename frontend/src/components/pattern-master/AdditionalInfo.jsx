@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { FileText } from 'lucide-react';
 import { labelStyle, inputStyle } from './styles';
+import CharacterCounter from '../common/CharacterCounter';
 
 const AdditionalInfo = ({ data, onChange }) => {
     return (
@@ -27,8 +28,10 @@ const AdditionalInfo = ({ data, onChange }) => {
                         value={data.Comment}
                         onChange={onChange}
                         rows="3"
+                        maxLength={500}
                         style={{ ...inputStyle, resize: 'vertical' }}
                     />
+                    <CharacterCounter value={data.Comment} maxLength={500} showAt={400} />
                 </div>
             </div>
         </div>

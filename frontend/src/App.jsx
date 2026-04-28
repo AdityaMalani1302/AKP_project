@@ -24,7 +24,6 @@ const RejectionDashboard = lazy(() => import('./components/RejectionDashboard'))
 const DailyDashboard = lazy(() => import('./components/DailyDashboard'));
 const FYComparison = lazy(() => import('./components/FYComparison'));
 const HomePage = lazy(() => import('./components/HomePage'));
-const Marketing = lazy(() => import('./components/Marketing'));
 const QualityManagementSystem = lazy(() => import('./components/QualityManagementSystem'));
 const SandTestingDashboard = lazy(() => import('./components/quality-management/SandTestingDashboard'));
 const StatisticalProcessControl = lazy(() => import('./components/quality-management/StatisticalProcessControl'));
@@ -157,7 +156,6 @@ const routeConfig = [
   { path: '/admin', component: UserManagement, requiredRole: 'admin' },
   { path: '/report-builder', component: ReportBuilder, requiredRole: 'admin' },
   { path: '/report-scheduler', component: ReportScheduler, requiredRole: 'admin' },
-  { path: '/marketing', component: Marketing, requiredPage: 'marketing' },
 
   { path: '/quality-management-system', component: QualityManagementSystem, requiredPage: 'quality-management-system' },
   { path: '/quality-management-system/sand-testing', component: SandTestingDashboard, requiredPage: 'qms-sand-testing' },
@@ -220,7 +218,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors />
+      <Toaster position="top-right" richColors aria-live="polite" />
       <GlobalErrorBoundary>
           <ScrollToTop />
           <Routes>

@@ -58,12 +58,15 @@ const connectSQL = async () => {
     }
 };
 
+const VALID_DB_NAMES = new Set(Object.keys(databases));
+
 const getPool = (dbName) => {
     if (pools[dbName]) {
         return pools[dbName];
     }
-    // Default to first one if not found or throw error? 
-    // For now, let's return null if not found
+    if (!VALID_DB_NAMES.has(dbName)) {
+        console.error(`getPool called with unknown database name: ${dbName}`);
+    }
     return null;
 };
 

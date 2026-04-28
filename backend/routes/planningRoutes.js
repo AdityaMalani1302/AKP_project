@@ -4,6 +4,9 @@ const { sql } = require('../config/db');
 const { cacheMiddleware, invalidateCache } = require('../utils/cache');
 const { validateBody, planningMasterSchema, planningEntrySchema, sleeveRequirementSchema } = require('../utils/validators');
 const logger = require('../utils/logger');
+const multer = require('multer');
+const ExcelJS = require('exceljs');
+const upload = multer({ storage: multer.memoryStorage() });
 
 // GET /raw-materials - Get raw materials for Item Code dropdown (cached 5 minutes)
 router.get('/raw-materials', cacheMiddleware('raw-materials', 300), async (req, res) => {
@@ -45,7 +48,8 @@ router.get('/planning-master', async (req, res) => {
                 ItemCode,
                 CustName as CustomerName,
                 SQty as ScheduleQty,
-                PlanDate
+                PlanDate,
+                DeliveryDate
             FROM PPC
             WHERE DATEDIFF(month, GETDATE(), PlanDate) IN (0, 1)
         `;
@@ -67,14 +71,7 @@ router.get('/planning-master', async (req, res) => {
 
 // POST /planning-master - Create new planning schedule in PPC table
 router.post('/planning-master', validateBody(planningMasterSchema), async (req, res) => {
-    const { ItemCode, CustomerName, ScheduleQty, PlanDate } = req.body;
-
-    // Validation
-    if (!ItemCode || !CustomerName || !ScheduleQty || !PlanDate) {
-        return res.status(400).json({
-            error: 'Item Code, Customer Name, Schedule Qty, and Plan Date are required'
-        });
-    }
+    const { ItemCode, CustomerName, ScheduleQty, PlanDate, DeliveryDate } = req.body;
 
     try {
         const request = new sql.Request(req.db);
@@ -82,11 +79,12 @@ router.post('/planning-master', validateBody(planningMasterSchema), async (req, 
         request.input('CustName', sql.VarChar(50), CustomerName);
         request.input('SQty', sql.Numeric(18, 0), parseInt(ScheduleQty));
         request.input('PlanDate', sql.DateTime, new Date(PlanDate));
+        request.input('DeliveryDate', sql.DateTime, DeliveryDate ? new Date(DeliveryDate) : null);
 
         const result = await request.query`
-            INSERT INTO PPC (ItemCode, CustName, SQty, PlanDate)
+            INSERT INTO PPC (ItemCode, CustName, SQty, PlanDate, DeliveryDate)
             OUTPUT INSERTED.id
-            VALUES (@ItemCode, @CustName, @SQty, @PlanDate)
+            VALUES (@ItemCode, @CustName, @SQty, @PlanDate, @DeliveryDate)
         `;
 
         const newId = result.recordset[0].id;
@@ -107,14 +105,7 @@ router.post('/planning-master', validateBody(planningMasterSchema), async (req, 
 // PUT /planning-master/:id - Update existing planning schedule in PPC table
 router.put('/planning-master/:id', validateBody(planningMasterSchema), async (req, res) => {
     const { id } = req.params;
-    const { ItemCode, CustomerName, ScheduleQty, PlanDate } = req.body;
-
-    // Validation
-    if (!ItemCode || !CustomerName || !ScheduleQty || !PlanDate) {
-        return res.status(400).json({
-            error: 'Item Code, Customer Name, Schedule Qty, and Plan Date are required'
-        });
-    }
+    const { ItemCode, CustomerName, ScheduleQty, PlanDate, DeliveryDate } = req.body;
 
     try {
         const request = new sql.Request(req.db);
@@ -123,6 +114,7 @@ router.put('/planning-master/:id', validateBody(planningMasterSchema), async (re
         request.input('CustName', sql.VarChar(50), CustomerName);
         request.input('SQty', sql.Numeric(18, 0), parseInt(ScheduleQty));
         request.input('PlanDate', sql.DateTime, new Date(PlanDate));
+        request.input('DeliveryDate', sql.DateTime, DeliveryDate ? new Date(DeliveryDate) : null);
 
         const result = await request.query`
             UPDATE PPC
@@ -130,7 +122,8 @@ router.put('/planning-master/:id', validateBody(planningMasterSchema), async (re
                 ItemCode = @ItemCode,
                 CustName = @CustName,
                 SQty = @SQty,
-                PlanDate = @PlanDate
+                PlanDate = @PlanDate,
+                DeliveryDate = @DeliveryDate
             WHERE id = @id
         `;
 
@@ -153,9 +146,14 @@ router.delete('/planning-master/:id', async (req, res) => {
     const { id } = req.params;
     logger.info('DELETE request received for ID:', id);
 
+    const idNum = parseInt(id);
+    if (isNaN(idNum)) {
+        return res.status(400).json({ error: 'Invalid ID' });
+    }
+
     try {
         const request = new sql.Request(req.db);
-        request.input('id', sql.Int, parseInt(id));
+        request.input('id', sql.Int, idNum);
 
         const result = await request.query`
             DELETE FROM PPC WHERE id = @id
@@ -180,11 +178,103 @@ router.delete('/planning-master/:id', async (req, res) => {
     }
 });
 
-// GET /planning-entry - Get all planning entries
-router.get('/planning-entry', async (req, res) => {
+// POST /planning-master/import-excel - Import planning schedules from Excel
+router.post('/planning-master/import-excel', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
     try {
-        // Ensure table exists with all columns
-        await req.db.request().query(`
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+        const worksheet = workbook.worksheets[0];
+        
+        if (!worksheet || worksheet.rowCount < 2) {
+            return res.status(400).json({ error: 'Excel file is empty or has no data rows' });
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        // Helper function to get cell value
+        const getCellValue = (cell) => {
+            if (!cell || cell.value === null || cell.value === undefined) return '';
+            if (typeof cell.value === 'object' && cell.value.text) return cell.value.text;
+            if (typeof cell.value === 'object' && cell.value.richText) {
+                return cell.value.richText.map(rt => rt.text).join('');
+            }
+            return String(cell.value);
+        };
+
+        // Helper to parse Excel date
+        const parseExcelDate = (val) => {
+            if (!val) return null;
+            if (val instanceof Date) return val;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
+        // Process data starting from row 2
+        for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+            const row = worksheet.getRow(rowNumber);
+            
+            try {
+                const itemCode = getCellValue(row.getCell(1));
+                const customerName = getCellValue(row.getCell(2));
+                const scheduleQtyStr = getCellValue(row.getCell(3));
+                const scheduleQty = parseInt(scheduleQtyStr);
+                const planDateVal = getCellValue(row.getCell(4));
+                const deliveryDateVal = getCellValue(row.getCell(5));
+
+                if (!itemCode || !customerName || !scheduleQty || !planDateVal) {
+                    errors.push(`Row ${rowNumber}: Missing required fields`);
+                    errorCount++;
+                    continue;
+                }
+
+                const planDate = parseExcelDate(planDateVal);
+                const deliveryDate = deliveryDateVal ? parseExcelDate(deliveryDateVal) : null;
+
+                if (!planDate) {
+                    errors.push(`Row ${rowNumber}: Invalid plan date`);
+                    errorCount++;
+                    continue;
+                }
+
+                const request = new sql.Request(req.db);
+                request.input('ItemCode', sql.VarChar(50), itemCode);
+                request.input('CustName', sql.VarChar(50), customerName);
+                request.input('SQty', sql.Numeric(18, 0), scheduleQty);
+                request.input('PlanDate', sql.DateTime, planDate);
+                request.input('DeliveryDate', sql.DateTime, deliveryDate);
+
+                await request.query`
+                    INSERT INTO PPC (ItemCode, CustName, SQty, PlanDate, DeliveryDate)
+                    VALUES (@ItemCode, @CustName, @SQty, @PlanDate, @DeliveryDate)
+                `;
+
+                successCount++;
+            } catch (rowErr) {
+                errors.push(`Row ${rowNumber}: ${rowErr.message}`);
+                errorCount++;
+            }
+        }
+
+        invalidateCache('raw-materials');
+        res.json({ successCount, errorCount, errors: errors.slice(0, 10) });
+    } catch (err) {
+        logger.error('Error importing Excel:', err);
+        res.status(500).json({ error: 'Failed to import Excel file' });
+    }
+});
+
+// One-time table migration (runs on first request)
+let planningEntryMigrated = false;
+const ensurePlanningEntryTable = async (db) => {
+    if (planningEntryMigrated) return;
+    try {
+        await db.request().query(`
             IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PlanningEntry')
             CREATE TABLE PlanningEntry (
                 EntryId INT IDENTITY(1,1) PRIMARY KEY,
@@ -195,7 +285,8 @@ router.get('/planning-entry', async (req, res) => {
                 PartRowId INT,
                 PartNo VARCHAR(255),
                 PartName VARCHAR(255),
-                Cavity INT,
+                Cavity VARCHAR(255),
+                Weight VARCHAR(255),
                 CoreType VARCHAR(255),
                 ProductionQty INT,
                 PlateQty INT NOT NULL,
@@ -209,9 +300,7 @@ router.get('/planning-entry', async (req, res) => {
                 CreatedAt DATETIME DEFAULT GETDATE()
             )
         `);
-
-        // Add new columns if they don't exist (for existing tables)
-        await req.db.request().query(`
+        await db.request().query(`
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PlanningEntry') AND name = 'CustomerName')
             ALTER TABLE PlanningEntry ADD CustomerName VARCHAR(255);
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PlanningEntry') AND name = 'PartName')
@@ -235,20 +324,27 @@ router.get('/planning-entry', async (req, res) => {
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PlanningEntry') AND name = 'Weight')
             ALTER TABLE PlanningEntry ADD Weight DECIMAL(10,2);
         `);
-
-        // Fix: Ensure Cavity and Weight are VARCHAR to support comma-separated values for multi-part entries
-        // Use INFORMATION_SCHEMA for reliable type checking
-        await req.db.request().query(`
+        await db.request().query(`
             IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'PlanningEntry' AND COLUMN_NAME = 'Cavity' AND DATA_TYPE = 'int')
             BEGIN
                 ALTER TABLE PlanningEntry ALTER COLUMN Cavity VARCHAR(255);
             END
-
             IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'PlanningEntry' AND COLUMN_NAME = 'Weight' AND DATA_TYPE != 'varchar')
             BEGIN
                 ALTER TABLE PlanningEntry ALTER COLUMN Weight VARCHAR(255);
             END
         `);
+        planningEntryMigrated = true;
+        logger.info('PlanningEntry table migration complete');
+    } catch (err) {
+        logger.error('PlanningEntry table migration error:', err);
+    }
+};
+
+// GET /planning-entry - Get all planning entries
+router.get('/planning-entry', async (req, res) => {
+    try {
+        await ensurePlanningEntryTable(req.db);
 
         const result = await req.db.request().query(`
             SELECT * FROM PlanningEntry ORDER BY EntryId DESC
@@ -328,9 +424,14 @@ router.post('/planning-entry', validateBody(planningEntrySchema), async (req, re
 router.delete('/planning-entry/:id', async (req, res) => {
     const { id } = req.params;
 
+    const idNum = parseInt(id);
+    if (isNaN(idNum)) {
+        return res.status(400).json({ error: 'Invalid ID' });
+    }
+
     try {
         const request = new sql.Request(req.db);
-        request.input('id', sql.Int, parseInt(id));
+        request.input('id', sql.Int, idNum);
 
         const result = await request.query`
             DELETE FROM PlanningEntry WHERE EntryId = @id
@@ -351,13 +452,18 @@ router.delete('/planning-entry/:id', async (req, res) => {
 });
 
 // PUT /planning-entry/:id - Update a planning entry
-router.put('/planning-entry/:id', validateBody(planningEntrySchema), async (req, res) => {
+router.put('/planning-entry/:id', async (req, res) => {
     const { id } = req.params;
     const entry = req.body;
 
+    const idNum = parseInt(id);
+    if (isNaN(idNum)) {
+        return res.status(400).json({ error: 'Invalid entry ID' });
+    }
+
     try {
         const request = new sql.Request(req.db);
-        request.input('id', sql.Int, parseInt(id));
+        request.input('id', sql.Int, idNum);
         request.input('PlanDate', sql.Date, entry.planDate ? new Date(entry.planDate) : null);
         request.input('ProductionQty', sql.VarChar(255), String(entry.productionQty || ''));
         request.input('PlateQty', sql.VarChar(255), String(entry.plateQty || ''));
@@ -409,7 +515,7 @@ router.get('/sleeve-requirement', async (req, res) => {
         const result = await request.query`
             SELECT PatternNo, PlateQty, Sleeves 
             FROM PlanningEntry 
-            WHERE CAST(PlanDate AS DATE) = @planDate AND Shift = @shift
+            WHERE CAST(PlanDate AS DATE) = @planDate AND CAST(Shift AS VARCHAR) = @shift
             ORDER BY PatternNo
         `;
 
@@ -512,6 +618,7 @@ router.get('/sleeve-requirement', async (req, res) => {
 router.post('/sleeve-requirement', validateBody(sleeveRequirementSchema), async (req, res) => {
     const { planDate, shift, entries } = req.body;
 
+    let transaction;
     try {
         // Ensure table exists
         await req.db.request().query(`
@@ -529,7 +636,7 @@ router.post('/sleeve-requirement', validateBody(sleeveRequirementSchema), async 
             )
         `);
 
-        const transaction = new sql.Transaction(req.db);
+        transaction = new sql.Transaction(req.db);
         await transaction.begin();
 
         for (const entry of entries) {
@@ -555,6 +662,9 @@ router.post('/sleeve-requirement', validateBody(sleeveRequirementSchema), async 
             message: `Successfully submitted ${entries.length} sleeve requirement(s)`
         });
     } catch (err) {
+        if (transaction) {
+            try { await transaction.rollback(); } catch (rbErr) { logger.error('Rollback failed:', rbErr); }
+        }
         logger.error('Error saving sleeve requirements:', err);
         res.status(500).json({ error: 'Failed to save sleeve requirements' });
     }
@@ -982,7 +1092,13 @@ router.get('/reports', async (req, res) => {
                 FROM dbo.Product p
                 LEFT JOIN RawMaterial r ON r.RawMatID = p.RawMatID
                 INNER JOIN dbo.Grade G ON r.GradeID = G.GradeID
-                INNER JOIN Invent_Rawmaterial i ON i.Af_ID = r.Rawmatid
+                LEFT JOIN (
+                    SELECT Af_ID, Comman_No, pur_vendor, SubContractor_Name, IS_RawCasting,
+                           Moulding_Box_Size, [Yield %], No_Of_Cavities,
+                           Sleeve, No_Of_Sleeves, No_of_Cores,
+                           ROW_NUMBER() OVER (PARTITION BY Af_ID ORDER BY Af_ID) AS rn
+                    FROM Invent_Rawmaterial
+                ) i ON i.Af_ID = r.Rawmatid AND i.rn = 1
                 LEFT JOIN (
                     SELECT PartNo, PatternId, Qty,
                         ROW_NUMBER() OVER (PARTITION BY PartNo ORDER BY PatternId) AS rn
@@ -996,17 +1112,13 @@ router.get('/reports', async (req, res) => {
                     FROM SleeveMaster
                     GROUP BY PatternId
                 ) sm ON pm.PatternId = sm.PatternId
-                LEFT JOIN (
-                    SELECT DISTINCT r2.RawMatID, sc2.Price, sc2.EffectiveDate, c.CustName
+                OUTER APPLY (
+                    SELECT TOP 1 sc2.Price, sc2.EffectiveDate, c.CustName
                     FROM Sales_CustSettingDetails sc2
-                    INNER JOIN (
-                        SELECT ProdId, MAX(EffectiveDate) AS mdate
-                        FROM Sales_CustSettingDetails
-                        GROUP BY ProdId
-                    ) msc ON msc.ProdId = sc2.ProdId AND sc2.EffectiveDate = msc.mdate
                     INNER JOIN Customer c ON c.CustId = sc2.CustId
-                    INNER JOIN RawMaterial r2 ON r2.RawMatID = sc2.ProdId
-                ) PR ON p.ProdId = PR.RawMatID
+                    WHERE sc2.ProdId = p.RawMatID
+                    ORDER BY sc2.EffectiveDate DESC
+                ) PR
                 WHERE p.ProdID LIKE '%'
             ) pl ON pl.RawMatCode = p.ItemCode
             LEFT JOIN (
@@ -1120,7 +1232,7 @@ router.get('/reports', async (req, res) => {
         logger.error('SQL Error:', err.message);
         logger.error('SQL Errors:', err.precedingErrors);
         logger.error('Error fetching planning report:', err);
-        res.status(500).json({ error: 'Failed to fetch planning report', details: err.message });
+        res.status(500).json({ error: 'Failed to fetch planning report' });
     }
 });
 
@@ -1174,14 +1286,18 @@ router.get('/boxes-calculation', async (req, res) => {
             FROM PPC ppc
             INNER JOIN RawMaterial rm ON rm.RawMatCode = ppc.ItemCode
             INNER JOIN Product p ON p.RawMatID = rm.RawMatID
-            INNER JOIN (
+            LEFT JOIN (
                 SELECT PartNo, PatternId, Qty,
                     ROW_NUMBER() OVER (PARTITION BY PartNo ORDER BY PatternId) AS rn
                 FROM PatternCavityMaster
             ) pcm ON p.ProdId = pcm.PartNo AND pcm.rn = 1
-            INNER JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
+            LEFT JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
             LEFT JOIN Customer c ON pm.Customer = c.CustId
-            LEFT JOIN Invent_Rawmaterial ir ON ir.Af_ID = rm.RawMatID
+            LEFT JOIN (
+                SELECT Af_ID, Moulding_Box_Size, No_Of_Cavities,
+                    ROW_NUMBER() OVER (PARTITION BY Af_ID ORDER BY Af_ID) AS rn
+                FROM Invent_Rawmaterial
+            ) ir ON ir.Af_ID = rm.RawMatID AND ir.rn = 1
             WHERE ppc.PlanDate >= @fromDate AND ppc.PlanDate <= @toDate
             ${patternFilter}
             GROUP BY pm.PatternId, pm.PatternNo, ppc.CustName, c.CustName, 
@@ -1194,7 +1310,7 @@ router.get('/boxes-calculation', async (req, res) => {
     } catch (err) {
         logger.error('SQL Error:', err.message);
         logger.error('Error fetching boxes calculation report:', err);
-        res.status(500).json({ error: 'Failed to fetch boxes calculation report', details: err.message });
+        res.status(500).json({ error: 'Failed to fetch boxes calculation report' });
     }
 });
 
@@ -1229,33 +1345,32 @@ router.get('/core-calculation', async (req, res) => {
                 ISNULL(ppc.CustName, c.CustName) AS CustomerName,
                 CAST(pcm.PartNo AS VARCHAR) AS PartNo,
                 ISNULL(p2.ProdName, pcm.ProductName) AS PartName,
-                ISNULL(ir.Core_Type_C1, ISNULL(pm.Core_Type, '')) AS CoreType,
-                ISNULL(NULLIF(ir.Shell_Core, 0), ISNULL(pm.shell_qty, 0)) AS ShellQty,
-                ISNULL(NULLIF(ir.Cold_Box, 0), ISNULL(pm.coldBox_qty, 0)) AS ColdBoxQty,
-                ISNULL(NULLIF(ir.No_Bake, 0), ISNULL(pm.noBake_qty, 0)) AS NoBakeQty,
+                ISNULL(pm.Core_Type, '') AS CoreType,
+                ISNULL(pm.shell_qty, 0) + ISNULL(pm.coldBox_qty, 0) + ISNULL(pm.noBake_qty, 0) AS TotalNoOfCore,
+                ISNULL(pm.shell_qty, 0) AS ShellQty,
+                ISNULL(pm.coldBox_qty, 0) AS ColdBoxQty,
+                ISNULL(pm.noBake_qty, 0) AS NoBakeQty,
                 SUM(CAST(ppc.SQty AS INT)) AS ProductionQty,
-                SUM(CAST(ppc.SQty AS INT)) * ISNULL(rm.Weight, 0) AS TotalCoreWeight
+                CAST(ISNULL(pm.Core_Wt, 0) AS FLOAT) AS CoreWeight,
+                SUM(CAST(ppc.SQty AS INT)) * CAST(ISNULL(pm.Core_Wt, 0) AS FLOAT) AS TotalCoreWeight
             FROM PPC ppc
             INNER JOIN RawMaterial rm ON rm.RawMatCode = ppc.ItemCode
             INNER JOIN Product p ON p.RawMatID = rm.RawMatID
-            INNER JOIN (
+            LEFT JOIN (
                 SELECT PartNo, PatternId, Qty, ProductName,
                     ROW_NUMBER() OVER (PARTITION BY PartNo ORDER BY PatternId) AS rn
                 FROM PatternCavityMaster
             ) pcm ON p.ProdId = pcm.PartNo AND pcm.rn = 1
-            INNER JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
+            LEFT JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
             LEFT JOIN Customer c ON pm.Customer = c.CustId
             LEFT JOIN Product p2 ON pcm.PartNo = p2.ProdId
-            LEFT JOIN Invent_Rawmaterial ir ON ir.Af_ID = rm.RawMatID
             WHERE ppc.PlanDate >= @fromDate AND ppc.PlanDate <= @toDate
             ${patternFilter}
             GROUP BY pm.PatternId, pm.PatternNo, ppc.CustName, c.CustName, 
                      pcm.PartNo, p2.ProdName, pcm.ProductName, 
-                     ISNULL(ir.Core_Type_C1, ISNULL(pm.Core_Type, '')),
-                     ISNULL(NULLIF(ir.Shell_Core, 0), ISNULL(pm.shell_qty, 0)), 
-                     ISNULL(NULLIF(ir.Cold_Box, 0), ISNULL(pm.coldBox_qty, 0)), 
-                     ISNULL(NULLIF(ir.No_Bake, 0), ISNULL(pm.noBake_qty, 0)), 
-                     rm.Weight
+                     pm.Core_Type,
+                     pm.shell_qty, pm.coldBox_qty, pm.noBake_qty,
+                     pm.Core_Wt
             ORDER BY pm.PatternNo, pcm.PartNo
         `;
 
@@ -1264,7 +1379,7 @@ router.get('/core-calculation', async (req, res) => {
     } catch (err) {
         logger.error('SQL Error:', err.message);
         logger.error('Error fetching core calculation report:', err);
-        res.status(500).json({ error: 'Failed to fetch core calculation report', details: err.message });
+        res.status(500).json({ error: 'Failed to fetch core calculation report' });
     }
 });
 
@@ -1314,16 +1429,20 @@ router.get('/sleeve-calculation', async (req, res) => {
             FROM PPC ppc
             INNER JOIN RawMaterial rm ON rm.RawMatCode = ppc.ItemCode
             INNER JOIN Product p ON p.RawMatID = rm.RawMatID
-            INNER JOIN (
+            LEFT JOIN (
                 SELECT PartNo, PatternId, Qty, ProductName,
                     ROW_NUMBER() OVER (PARTITION BY PartNo ORDER BY PatternId) AS rn
                 FROM PatternCavityMaster
             ) pcm ON p.ProdId = pcm.PartNo AND pcm.rn = 1
-            INNER JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
+            LEFT JOIN PatternMaster pm ON pcm.PatternId = pm.PatternId
             LEFT JOIN Customer c ON pm.Customer = c.CustId
             LEFT JOIN Product p2 ON pcm.PartNo = p2.ProdId
             LEFT JOIN SleeveMaster sm ON pm.PatternId = sm.PatternId
-            LEFT JOIN Invent_Rawmaterial ir ON ir.Af_ID = rm.RawMatID
+            LEFT JOIN (
+                SELECT Af_ID, No_Of_Cavities, No_Of_Sleeves,
+                    ROW_NUMBER() OVER (PARTITION BY Af_ID ORDER BY Af_ID) AS rn
+                FROM Invent_Rawmaterial
+            ) ir ON ir.Af_ID = rm.RawMatID AND ir.rn = 1
             LEFT JOIN RawMaterial rmSleeve ON 
                 CASE 
                     WHEN sm.sleeve_type_size IS NOT NULL AND sm.sleeve_type_size != '' AND ISNUMERIC(sm.sleeve_type_size) = 1 
@@ -1344,7 +1463,7 @@ router.get('/sleeve-calculation', async (req, res) => {
     } catch (err) {
         logger.error('SQL Error:', err.message);
         logger.error('Error fetching sleeve calculation report:', err);
-        res.status(500).json({ error: 'Failed to fetch sleeve calculation report', details: err.message });
+        res.status(500).json({ error: 'Failed to fetch sleeve calculation report' });
     }
 });
 

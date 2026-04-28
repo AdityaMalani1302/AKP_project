@@ -12,17 +12,13 @@ const Login = ({ setUser }) => {
     const [rememberMe, setRememberMe] = useState(false);
     const navigate = useNavigate();
 
-    // Load remembered credentials on mount
     useEffect(() => {
         const savedUsername = localStorage.getItem('rememberedUsername');
-        const savedPassword = localStorage.getItem('rememberedPassword');
         if (savedUsername) {
             setUsername(savedUsername);
             setRememberMe(true);
         }
-        if (savedPassword) {
-            setPassword(savedPassword);
-        }
+        localStorage.removeItem('rememberedPassword');
     }, []);
 
     const handleLogin = async (e) => {
@@ -32,13 +28,10 @@ const Login = ({ setUser }) => {
         try {
             const res = await api.post('/auth/login', { username, password });
             if (res.data.success) {
-                // Handle Remember Me
                 if (rememberMe) {
                     localStorage.setItem('rememberedUsername', username);
-                    localStorage.setItem('rememberedPassword', password);
                 } else {
                     localStorage.removeItem('rememberedUsername');
-                    localStorage.removeItem('rememberedPassword');
                 }
                 
                 toast.success('Login successful!');

@@ -3,7 +3,7 @@ import { labelStyle, inputStyle, selectStyle } from './styles';
 import DatePicker from '../common/DatePicker';
 import { Box } from 'lucide-react';
 
-const CoreBoxSection = ({ data, onChange, errors: _errors = {} }) => {
+const CoreBoxSection = ({ data, onChange }) => {
     return (
         <div className="section-container section-yellow">
             <h3 className="section-title yellow" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
